@@ -4,6 +4,7 @@ env.VariantDir('build', 'src', duplicate=0)
 env.VariantDir('build/test', 'test', duplicate=0)
 
 srcs = ['cpu.cpp',
+        'northBridge.cpp',
         'float16.cpp',
         'memory.cpp']
 srcs = ['build/' + s for s in srcs]

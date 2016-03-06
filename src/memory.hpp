@@ -3,7 +3,9 @@
 
 #include <stdint.h>
 
-class Memory {
+#include "object.hpp"
+
+class Memory : public Object {
     int size;
     uint8_t *ptr;
 

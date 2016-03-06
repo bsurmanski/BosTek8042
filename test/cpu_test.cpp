@@ -2,15 +2,20 @@
 
 #include "cpu.hpp"
 #include "memory.hpp"
+#include "northBridge.hpp"
 
 class CpuTest : public testing::Test {
     protected:
+    NorthBridge *nbr;
     Memory *mem;
     Cpu *cpu;
 
     virtual void SetUp() {
         mem = new Memory(0xFFFF);
-        cpu = new Cpu(mem);
+        cpu = new Cpu();
+        nbr = new NorthBridge();
+        nbr->attachCpu(cpu);
+        nbr->attachMemory(mem);
 
         cpu->pc = 0x0000;
         cpu->sp = 0x1000; // grows down
@@ -18,8 +23,7 @@ class CpuTest : public testing::Test {
     }
 
     virtual void TearDown() {
-        delete cpu;
-        delete mem;
+        delete nbr;
     }
 };
 
@@ -357,18 +361,18 @@ TEST_F(CpuTest, Jump) {
     // jump address will stay the same at 0x2000
     // first byte will be modified across tests to change jump type
     uint8_t ops[] = {
-        0x70, 0x00, 0x20,
+        0x68, 0x00, 0x20,
     };
 
     mem->fill(0x0000, sizeof(ops), ops);
 
     // jump flag set/clear
-    // SZVITPHC
+    // SZVITFHC
     for(int i = 0; i < 8; i++) {
         // jump flag set
         Cpu::Flag f = (Cpu::Flag) (7-i);
         cpu->set_flag(f, 0);
-        mem->writeb(0x0000, 0x67-i); // JbC
+        mem->writeb(0x0000, Cpu::JSC-i); // JbC
         cpu->clk();
         EXPECT_EQ(cpu->pc, 0x2000); // we jumped
 
@@ -379,7 +383,7 @@ TEST_F(CpuTest, Jump) {
 
         // jump flag set
         cpu->set_flag(f, 0);
-        mem->writeb(0x0000, 0x6F-i); // JbS
+        mem->writeb(0x0000, Cpu::JSS-i); // JbS
         cpu->clk();
         EXPECT_EQ(cpu->pc, 0x0003); // we didn't jump
 
@@ -390,16 +394,17 @@ TEST_F(CpuTest, Jump) {
     }
 
     cpu->pc = 0x0000;
-    mem->writeb(0x0000, 0x70); // JMP K
+    mem->writeb(0x0000, Cpu::JMPK); // JMP K
     mem->writew(0x0001, 0x2000);
     cpu->clk();
     EXPECT_EQ(cpu->pc, 0x2000);
 
     cpu->pc = 0x0000;
     cpu->write_wreg(Cpu::WREG_HL, 0x3000);
-    mem->writeb(0x0000, 0x71); // JMP M
+    mem->writeb(0x0000, Cpu::JMPM); // JMP M
     cpu->clk();
     EXPECT_EQ(cpu->pc, 0x3000);
+
 }
 
 TEST_F(CpuTest, Arithmetic8) {
@@ -432,12 +437,12 @@ TEST_F(CpuTest, Arithmetic8) {
 
     mem->fill(0x0000, sizeof(ops), ops);
 
-    //TODO: test flags
-
     // ADD 0x02
     cpu->clk();
     EXPECT_EQ(cpu->pc, 0x0002);
     EXPECT_EQ(cpu->read_breg(Cpu::BREG_ACC), 0x02);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_Z), 0);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_S), 0);
 
     // ADD 0x40
     cpu->clk();
@@ -544,4 +549,82 @@ TEST_F(CpuTest, Arithmetic8) {
     cpu->write_breg(Cpu::BREG_ACC, 0x36);
     cpu->clk();
     EXPECT_EQ(cpu->read_breg(Cpu::BREG_ACC), 0xCA);
+}
+
+TEST_F(CpuTest, Arithmetic8_Flags) {
+    uint8_t ops[] = {
+        0x80, 0xFF, // ADD FF
+        0x80, 0x01, // ADD 01
+        0x80, 0x7F, // ADD 7F
+        0x80, 0x7F, // ADD 7F
+        0x90, 0xFF, // SUB -1
+        0xC5, // NEG
+        0xC5, 0xC4, // NEG, COM
+    };
+
+    mem->fill(0x0000, sizeof(ops), ops);
+
+    // test sign
+    cpu->clk();
+    EXPECT_EQ(cpu->read_breg(Cpu::BREG_ACC), 0xFF);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_S), 1);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_Z), 0);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_V), 0);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_C), 0);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_H), 0);
+
+    // test zero, carry, half carry
+    cpu->clk();
+    EXPECT_EQ(cpu->read_breg(Cpu::BREG_ACC), 0x00);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_S), 0);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_Z), 1);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_V), 0);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_C), 1);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_H), 1);
+
+    // test flags clearing
+    cpu->clk();
+    EXPECT_EQ(cpu->read_breg(Cpu::BREG_ACC), 0x7F);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_S), 0);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_Z), 0);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_V), 0);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_C), 0);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_H), 0);
+
+    // test overflow
+    cpu->clk();
+    EXPECT_EQ(cpu->read_breg(Cpu::BREG_ACC), 0xFE);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_S), 1);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_Z), 0);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_V), 1);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_C), 0);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_H), 1);
+
+    // test sub carry
+    cpu->clk();
+    EXPECT_EQ(cpu->read_breg(Cpu::BREG_ACC), 0xFF);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_S), 1);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_Z), 0);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_V), 0);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_C), 1);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_H), 1);
+
+    // NEG
+    cpu->clk();
+    EXPECT_EQ(cpu->read_breg(Cpu::BREG_ACC), 0x01);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_S), 0);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_Z), 0);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_V), 0);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_C), 1);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_H), 1);
+
+    // NEG, COM
+    cpu->clk();
+    cpu->clk();
+    EXPECT_EQ(cpu->read_breg(Cpu::BREG_ACC), 0x00);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_S), 0);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_Z), 1);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_V), 0);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_C), 1);
+    EXPECT_EQ(cpu->get_flag(Cpu::FLAG_H), 1);
 }
