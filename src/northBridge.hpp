@@ -7,6 +7,11 @@
 class Cpu;
 class Memory;
 
+/**
+ * Links together Cpu/Memory/IO
+ *
+ * Redirects memory mapped registers to appropriate location
+ */
 class NorthBridge : public Object {
     Cpu *cpu;
     Memory *mem;
