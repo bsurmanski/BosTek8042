@@ -14,11 +14,13 @@ class Memory : public Object {
     ~Memory();
 
     void zero();
-    void fill(uint16_t addr, int n, void *ptr);
-    uint8_t readb(uint16_t addr);
-    uint16_t readw(uint16_t addr);
-    void writeb(uint16_t addr, uint8_t v);
-    void writew(uint16_t addr, uint16_t v);
+    void fill(uint32_t addr, int n, void *ptr);
+    uint8_t readb(uint32_t addr);
+    uint16_t readw(uint32_t addr);
+    uint32_t readl(uint32_t addr);
+    void writeb(uint32_t addr, uint8_t v);
+    void writew(uint32_t addr, uint16_t v);
+    void writel(uint32_t addr, uint32_t v);
 };
 
 #endif

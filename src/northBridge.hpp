@@ -25,10 +25,12 @@ class NorthBridge : public Object {
     void detachCpu();
     void detachMemory();
 
-    uint8_t readb(uint16_t addr);
-    uint16_t readw(uint16_t addr);
-    void writeb(uint16_t addr, uint8_t v);
-    void writew(uint16_t addr, uint16_t v);
+    uint8_t readb(uint32_t addr);
+    uint16_t readw(uint32_t addr);
+    uint32_t readl(uint32_t addr);
+    void writeb(uint32_t addr, uint8_t v);
+    void writew(uint32_t addr, uint16_t v);
+    void writel(uint32_t addr, uint32_t v);
 };
 
 #endif

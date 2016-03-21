@@ -15,7 +15,7 @@ NorthBridge::~NorthBridge() {
 
 void NorthBridge::attachCpu(Cpu *_cpu) {
     cpu = _cpu;
-    cpu->nbr = this;
+    cpu->setNorthBridge(this);
 }
 
 void NorthBridge::attachMemory(Memory *_mem) {
@@ -31,20 +31,29 @@ void NorthBridge::detachMemory() {
 }
 
 
-uint8_t NorthBridge::readb(uint16_t addr) {
+uint8_t NorthBridge::readb(uint32_t addr) {
     if(mem) return mem->readb(addr);
     return 0x00;
 }
 
-uint16_t NorthBridge::readw(uint16_t addr) {
+uint16_t NorthBridge::readw(uint32_t addr) {
     if(mem) return mem->readw(addr);
     return 0x0000;
 }
 
-void NorthBridge::writeb(uint16_t addr, uint8_t v) {
+uint32_t NorthBridge::readl(uint32_t addr) {
+    if(mem) return mem->readl(addr);
+    return 0x00000000;
+}
+
+void NorthBridge::writeb(uint32_t addr, uint8_t v) {
     if(mem) return mem->writeb(addr, v);
 }
 
-void NorthBridge::writew(uint16_t addr, uint16_t v) {
+void NorthBridge::writew(uint32_t addr, uint16_t v) {
     if(mem) return mem->writew(addr, v);
+}
+
+void NorthBridge::writel(uint32_t addr, uint32_t v) {
+    if(mem) return mem->writel(addr, v);
 }
