@@ -1,32 +1,10 @@
 #include "bcpu.hpp"
+#include "bcpu_opcodes.hpp"
 
 #include <string.h>
 
-enum OpCodes {
-    NOP=0x00, HLT, WFI, RET, RFI, IRQ, NMI, CPUB, ANSB_R=0x08, ORSB_R, XRSB_R, ANSB_K=0x0C, ORSB_K, XRSB_K,
-    LODB_RK=0x10, LODW_RK, LODL_RK, LODF_RK, LLODB_RK, LLODW_RK, LLODL_RK, LLODF_RK, STOB_RK, STOW_RK, STOL_RK, STOF_RK, LSTOB_RK, LSTOW_RK, LSTOL_RK, LSTOF_RK,
-    LODB_RRK=0x20, LODW_RRK, LODL_RRK, LODF_RRK, LLODB_RRK, LLODW_RRK, LLODL_RRK, LLODF_RRK, STOB_RRK, STOW_RRK, STOL_RRK, STOF_RRK, LSTOB_RRK, LSTOW_RRK, LSTOL_RRK, LSTOF_RRK,
-    MOVB_RR=0x30, MOVW_RR, MOVL_RR, MOVF_RR, MOVB_RK, MOVW_RK, MOVL_RK, MOVF_RK, MOVB_RC=0x38, MOVB_CR=0x3C,
-    SWPB=0x40, SWPW, SWPL, SWPF, POPX_R=0x48, POPX_C, POPX_X, PSHX_R=0x4C, PSHX_C, PSHX_K,
-    BTOF=0x50, WTOF, LTOF, FTOB=0x54, FTOW, FTOL,
-    AJMP=0x60, LAJMP, AJSR, LAJSR, RJMP, LRJMP, RJSR, LRJSR,
-    JCC=0x70, JHC, JFC, JTC, JIC, JVC, JZC, JSC, JCS=0x78, JHS, JFS, JTS, JIS, JVS, JZS, JSS,
-    ADD=0x80, ADDB_RR=0x80, ADDW_RR, ADDL_RR, ADDF_RR, ADDB_RK, ADDW_RK, ADDL_RK, ADDF_RK,
-    ADC = 0x88, ADCB_RR=0x88, ADCW_RR, ADCL_RR, ADCF_RR, ADCB_RK, ADCW_RK, ADCL_RK, ADCF_RK,
-    SUB = 0x90, SUBB_RR=0x90, SUBW_RR, SUBL_RR, SUBF_RR, SUBB_RK, SUBW_RK, SUBL_RK, SUBF_RK,
-    SBC = 0x98, SBCB_RR=0x98, SBCW_RR, SBCL_RR, SBCF_RR, SBCB_RK, SBCW_RK, SBCL_RK, SBCF_RK,
-    CMP = 0xA0, CMPB_RR=0xA0, CMPW_RR, CMPL_RR, CMPF_RR, CMPB_RK, CMPW_RK, CMPL_RK, CMPF_RK,
-    AND = 0xA8, ANDB_RR=0xA8, ANDW_RR, ANDL_RR, ANDF_RR, ANDB_RK, ANDW_RK, ANDL_RK, ANDF_RK,
-    OR = 0xB0, ORB_RR=0xB0, ORW_RR, ORL_RR, ORF_RR, ORB_RK, ORW_RK, ORL_RK, ORF_RK,
-    XOR = 0xB8, XORB_RR=0xB8, XORW_RR, XORL_RR, XORF_RR, XORB_RK, XORW_RK, XORL_RK, XORF_RK,
-    MUL = 0xC0, MULB_RR=0xC0, MULW_RR, MULL_RR, MULF_RR, MULB_RK, MULW_RK, MULL_RK, MULF_RK,
-    DIV = 0xC8, DIVB_RR=0xC8, DIVW_RR, DIVL_RR, DIVF_RR, DIVB_RK, DIVW_RK, DIVL_RK, DIVF_RK,
-    MOD = 0xD0, MODB_RR=0xD0, MODW_RR, MODL_RR, MODF_RR, MODB_RK, MODW_RK, MODL_RK, MODF_RK,
-    POW = 0xD8, POWB_RR=0xD8, POWW_RR, POWL_RR, POWF_RR, POWB_RK, POWW_RK, POWL_RK, POWF_RK,
-    MIN = 0xE0, MINB_RR=0xE0, MINW_RR, MINL_RR, MINF_RR, MINB_RK, MINW_RK, MINL_RK, MINF_RK,
-    MAX = 0xE8, MAXB_RR=0xE8, MAXW_RR, MAXL_RR, MAXF_RR, MAXB_RK, MAXW_RK, MAXL_RK, MAXF_RK,
-    INCX=0xF0, DECX, TSTX, COMX, NEGX, ABSX, SXTX, ZXTX, SHLX, SHRX, ROLX, RORX, FGRP1,
-};
+#include <stdio.h>
+
 
 uint32_t BCpu::sign_mask(Type ty) {
     switch(ty) {
@@ -205,6 +183,7 @@ void BCpu::State::write_flag(Flag f, bool b) {
 
 BCpu::Effect BCpu::decode_control(uint8_t op1) {
     BCpu::State next(state);
+    uint8_t op2;
 
     if(op1 <= NMI) { // NULARY
         switch(op1) {
@@ -223,7 +202,8 @@ BCpu::Effect BCpu::decode_control(uint8_t op1) {
                 //TODO
         }
     } else { // UNAK8 (ANSB, ORSB, XRSB)
-        uint8_t op2 = nbr->readb(next.pc);
+        op2 = nbr->readb(next.pc+1);
+        next.pc+=2;
         if(op1 <= XRSB_R) { // if register version
             op2 = state.readb_register(op2 & 0x0F);
         }
@@ -433,7 +413,6 @@ BCpu::Effect BCpu::decode_jump(uint8_t op1) {
     return Effect(next, wb_type, wb_addr, wb_value);
 }
 
-#include <stdio.h>
 BCpu::Effect BCpu::decode_arithmetic(uint8_t op1) {
     BCpu::State next(state);
     uint8_t op2 = nbr->readb(state.pc+1);
@@ -444,10 +423,11 @@ BCpu::Effect BCpu::decode_arithmetic(uint8_t op1) {
         BCpu::Type type = (BCpu::Type) (op1 & 0x03);
         uint32_t v1 = state.read_register(reg1, type);
         uint32_t v2;
-        uint64_t wb = 0; // 64-bit for mul
+        uint32_t wb = 0;
         bool write_enable = true;
         uint32_t smask = sign_mask(type);
-        bool sign_parity = (bool) (smask & (v1 ^ v2)); // for mul div mod
+        bool sign_parity;
+        bool mul_overflow = false;
 
         if(imm) { // uses immediate constant
             switch(type) {
@@ -516,8 +496,14 @@ BCpu::Effect BCpu::decode_arithmetic(uint8_t op1) {
 
             case MUL:
                 wb = abs_value(type, v1) * abs_value(type, v2);
-                next.write_flag(FLAG_C, (wb > type_mask(type)));
-                if(sign_parity) wb = neg_value(type, wb);
+                if(abs_value(type, v1) != 0 &&
+                   (wb & type_mask(type)) / abs_value(type, v1) != abs_value(type, v2)) {
+                    mul_overflow = true;
+                }
+                next.write_flag(FLAG_C, mul_overflow);
+
+                // if only one is negative
+                if(smask & (v1 ^ v2)) wb = neg_value(type, wb);
                 break;
 
             case POW:
@@ -526,28 +512,37 @@ BCpu::Effect BCpu::decode_arithmetic(uint8_t op1) {
                     next.write_flag(FLAG_C, false);
                 } else {
                     wb = pow_value(abs_value(type, v1), abs_value(type, v2));
-                    next.write_flag(FLAG_C, (wb > type_mask(type)) ||
-                                            (abs_value(type, v1) >= 2 &&
-                                             v2 >= 32)); // catch overflow if value WAY overflows
+
+                    if ((wb > type_mask(type)) ||
+                        (abs_value(type, v1) >= 2 && v2 >= 32)) {
+                        mul_overflow = true;
+                    } // catch overflow if value WAY overflows
+                    next.write_flag(FLAG_C, mul_overflow);
+                    if(v1 & smask && v2 & 0x01)  // if v1 is negative, and v2 is odd
+                        wb = neg_value(type, wb);
                 }
                 break;
 
             case DIV:
                 // division by zero is an error
                 if(!v2 & type_mask(type)) {
-                    wb = type_mask(type); // if v2 is zero, then satrate
+                    wb = type_mask(type); // if v2 is zero, then saturate
                     next.write_flag(FLAG_T, true); // trap on div 0
                 } else {
                     wb = abs_value(type, v1) / abs_value(type, v2);
                 }
-                next.write_flag(FLAG_C, !v2); // only way to overflow is v2 == 0
-                if(sign_parity) wb = neg_value(type, wb);
+
+                mul_overflow = !v2;  // consider v2 == 0 to overflow
+                next.write_flag(FLAG_C, mul_overflow); // only way to carry is v2 == 0
+
+                // if only one is negative
+                if(smask & (v1 ^ v2)) wb = neg_value(type, wb);
                 break;
 
             case MOD:
                 // mod by zero is an error
                 if(!v2 & type_mask(type)) {
-                    wb = type_mask(type); // if v2 is zero, then satrate
+                    wb = type_mask(type); // if v2 is zero, then saturate
                     next.write_flag(FLAG_T, true); // trap on div 0
                 } else {
                     wb = abs_value(type, v1) % abs_value(type, v2);
@@ -559,9 +554,10 @@ BCpu::Effect BCpu::decode_arithmetic(uint8_t op1) {
 
         if(write_enable) next.write_register(reg1, type, wb);
         next.write_flag(FLAG_S, smask & wb);
-        next.write_flag(FLAG_V, (smask & ~wb & v1 & v2) || (smask & wb & ~v1 & ~v2));
+        next.write_flag(FLAG_V, (smask & ~wb & v1 & v2) || (smask & wb & ~v1 & ~v2) || mul_overflow);
         next.write_flag(FLAG_Z, !(wb & type_mask(type)));
     } else if(op1 <= RORX) { // unary
+        next.pc += 2;
         uint8_t reg1 = op2 & 0x0F;
         BCpu::Type type = (BCpu::Type) ((op2 & 0x30) >> 4);
         uint32_t v1 = state.read_register(reg1, type);
@@ -571,11 +567,13 @@ BCpu::Effect BCpu::decode_arithmetic(uint8_t op1) {
         switch(op1) {
             case INCX:
                 wb = v1+1;
-                next.write_flag(FLAG_C, (smask & v1 & ~wb));
+                next.write_flag(FLAG_C, !(wb & type_mask(type)));
+                next.write_flag(FLAG_V, (smask & (wb ^ v1)));
                 break;
             case DECX:
                 wb = v1-1;
-                next.write_flag(FLAG_C, (smask & v1 & ~wb));
+                next.write_flag(FLAG_C, !v1);
+                next.write_flag(FLAG_V, (smask & (wb ^ v1)));
                 break;
             case TSTX:
                 wb = v1;

@@ -91,9 +91,13 @@ class BCpu : public Cpu {
 #define FRIEND_TEST(X,Y)
 #endif
     friend class BCpuTest;
+    FRIEND_TEST(BCpuTest, StatusByte);
     FRIEND_TEST(BCpuTest, Arithmetic);
     FRIEND_TEST(BCpuTest, ADD);
     FRIEND_TEST(BCpuTest, ADC);
+    FRIEND_TEST(BCpuTest, MUL);
+    FRIEND_TEST(BCpuTest, DIV);
+    FRIEND_TEST(BCpuTest, INC_DEC);
 };
 
 #endif
