@@ -56,7 +56,7 @@ class BCpuTest : public testing::Test {
     BCpu *cpu;
 
     virtual void SetUp() {
-        mem = new Memory(0xFFFF);
+        mem = new Memory(0x2FFFF);
         cpu = new BCpu(0x1000, 0x1000);
         nbr = new NorthBridge;
         nbr->attachCpu(cpu);
@@ -76,7 +76,7 @@ class BCpuTest : public testing::Test {
     }
 
     Delta ExecuteJump(TestOp op) {
-        mem->fill(0x1000, op.len, op.ops);
+        mem->fill(cpu->state.pc, op.len, op.ops);
         Delta e = cpu->decode();
         cpu->apply(e);
         return e;
@@ -209,6 +209,123 @@ TEST_F(BCpuTest, PSH_POP) {
     Execute(TestOp(PSHX_R, (TYPE_LONG << 4) | REG_B));
     e = Execute(TestOp(POPX_R, (TYPE_LONG << 4) | REG_C));
     EXPECT_EQ(e.next.readl_register(REG_C), 0x45332211);
+}
+
+TEST_F(BCpuTest, SWP) {
+    Delta e;
+    Execute(TestOp(MOVB_RK, REG_B, 0x67));
+    Execute(TestOp(MOVB_RK, REG_C, 0xab));
+    e = Execute(TestOp(SWPB, REG_B | (REG_C << 4)));
+    EXPECT_EQ(e.next.readb_register(REG_B), 0xab);
+    EXPECT_EQ(e.next.readb_register(REG_C), 0x67);
+
+    Execute(TestOp(MOVW_RK, REG_BH, 0x96, 0x89));
+    Execute(TestOp(MOVW_RK, REG_CH, 0xab, 0xcd));
+    e = Execute(TestOp(SWPW, REG_BH | (REG_CH << 4)));
+    EXPECT_EQ(e.next.readw_register(REG_BH), 0xcdab);
+    EXPECT_EQ(e.next.readw_register(REG_CH), 0x8996);
+
+    Execute(TestOp(MOVL_RK, REG_A, 0x12, 0x34, 0x56, 0x78));
+    Execute(TestOp(MOVL_RK, REG_D, 0xab, 0xcd, 0xef, 0xbb));
+    e = Execute(TestOp(SWPL, REG_A | (REG_D << 4)));
+    EXPECT_EQ(e.next.readl_register(REG_D), 0x78563412);
+    EXPECT_EQ(e.next.readl_register(REG_A), 0xbbefcdab);
+}
+
+TEST_F(BCpuTest, JMP) {
+    Delta e;
+
+    // 0xFF padding to make sure it doesn't read too many bytes
+    e = ExecuteJump(TestOp(AJMP, 0x99, 0x20, 0xFF));
+    EXPECT_EQ(e.next.pc, 0x2099);
+    EXPECT_EQ(e.next.sp, 0x1000);
+
+    e = ExecuteJump(TestOp(LAJMP, 0x34, 0x20, 0x01, 0x00, 0xFF));
+    EXPECT_EQ(e.next.pc, 0x00012034);
+    EXPECT_EQ(e.next.sp, 0x1000);
+
+    e = ExecuteJump(TestOp(RJMP, 0x00, 0x80, 0xFF));
+    EXPECT_EQ(e.next.pc, 0xa037);
+    EXPECT_EQ(e.next.sp, 0x1000);
+
+    e = ExecuteJump(TestOp(RJMP, 0x00, 0x60, 0xFF));
+    EXPECT_EQ(e.next.pc, 0x1003a);
+    EXPECT_EQ(e.next.sp, 0x1000);
+
+    e = ExecuteJump(TestOp(LRJMP, 0x00, 0xEF, 0xFF, 0xFF, 0xFF));
+    EXPECT_EQ(e.next.pc, 0xef3f);
+    EXPECT_EQ(e.next.sp, 0x1000);
+}
+
+TEST_F(BCpuTest, JSR) {
+    Delta e;
+
+    // 0xFF padding to make sure it doesn't read too many bytes
+    e = ExecuteJump(TestOp(AJSR, 0x99, 0x20, 0xFF));
+    EXPECT_EQ(e.next.pc, 0x2099);
+    EXPECT_EQ(e.next.sp, 0x0ffc);
+
+    e = ExecuteJump(TestOp(LAJSR, 0x34, 0x20, 0x01, 0x00, 0xFF));
+    EXPECT_EQ(e.next.pc, 0x00012034);
+    EXPECT_EQ(e.next.sp, 0x0ff8);
+
+    e = ExecuteJump(TestOp(RJSR, 0x00, 0x80, 0xFF));
+    EXPECT_EQ(e.next.pc, 0xa037);
+    EXPECT_EQ(e.next.sp, 0x0ff4);
+
+    e = ExecuteJump(TestOp(RJSR, 0x00, 0x60, 0xFF));
+    EXPECT_EQ(e.next.pc, 0x1003a);
+    EXPECT_EQ(e.next.sp, 0x0ff0);
+
+    e = ExecuteJump(TestOp(LRJSR, 0x00, 0xEF, 0xFF, 0xFF, 0xFF));
+    EXPECT_EQ(e.next.pc, 0xef3f);
+    EXPECT_EQ(e.next.sp, 0x0fec);
+
+    e = ExecuteJump(TestOp(RET));
+    EXPECT_EQ(e.next.pc, 0x0001003f);
+    EXPECT_EQ(e.next.sp, 0x0ff0);
+
+    e = ExecuteJump(TestOp(RET));
+    EXPECT_EQ(e.next.pc, 0xa03a);
+    EXPECT_EQ(e.next.sp, 0x0ff4);
+
+    e = ExecuteJump(TestOp(RET));
+    EXPECT_EQ(e.next.pc, 0x00012037);
+    EXPECT_EQ(e.next.sp, 0x0ff8);
+
+    e = ExecuteJump(TestOp(RET));
+    EXPECT_EQ(e.next.pc, 0x209e);
+    EXPECT_EQ(e.next.sp, 0x0ffc);
+
+    e = ExecuteJump(TestOp(RET));
+    EXPECT_EQ(e.next.pc, 0x1003);
+    EXPECT_EQ(e.next.sp, 0x1000);
+}
+
+TEST_F(BCpuTest, CJMP) {
+    Delta e;
+
+    e = ExecuteJump(TestOp(JCC, 0x10, 0x00));
+    EXPECT_EQ(e.next.pc, 0x1013);
+    EXPECT_EQ(e.next.sp, 0x1000);
+
+    e = ExecuteJump(TestOp(JCS, 0x10, 0x00));
+    EXPECT_EQ(e.next.pc, 0x1016);
+    EXPECT_EQ(e.next.sp, 0x1000);
+
+    ExecuteJump(TestOp(ORSB_K, 0x01));
+    e = ExecuteJump(TestOp(JCS, 0x10, 0x00));
+    EXPECT_EQ(e.next.pc, 0x102b);
+    EXPECT_EQ(e.next.sp, 0x1000);
+
+    e = ExecuteJump(TestOp(JSS, 0x10, 0x00));
+    EXPECT_EQ(e.next.pc, 0x102e);
+    EXPECT_EQ(e.next.sp, 0x1000);
+
+    ExecuteJump(TestOp(ORSB_K, 0x80));
+    e = ExecuteJump(TestOp(JSS, 0xEF, 0xFF));
+    EXPECT_EQ(e.next.pc, 0x1022);
+    EXPECT_EQ(e.next.sp, 0x1000);
 }
 
 TEST_F(BCpuTest, ADD) {

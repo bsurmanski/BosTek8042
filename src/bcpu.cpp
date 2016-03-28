@@ -202,13 +202,19 @@ Delta BCpu::decode_control(uint8_t op1) {
             case HLT:
                 break;
             case WFI:
-            case RET:
+                //TODO: WFI stuff
             case RFI:
+                //TODO: RFI stuff
+            case RET:
+                next.pc = nbr->readl(state.sp);
+                next.sp += 4;
+                break;
             case IRQ:
+                //TODO: IRQ stuff
             case NMI:
+                //TODO: NMI stuff
                 next.pc++;
                 break;
-                //TODO
         }
     } else { // UNAK8 (ANSB, ORSB, XRSB)
         op2 = nbr->readb(next.pc+1);
@@ -405,13 +411,12 @@ Delta BCpu::decode_jump(uint8_t op1) {
         bool is_jsr = op1 & 0x02;
         bool is_relative = op1 & 0x04;
         if(is_long) { // long jump
-            next.pc += 5;
             target = nbr->readl(state.pc+1);
+            next.pc += 5;
         } else { // 16-bit jump
-            next.pc += 3;
             target = nbr->readw(state.pc+1);
-            if((target & 0x00008000) &&
-               is_relative) target |= 0xFFFF0000; //sign extend (only if relative)
+            next.pc += 3;
+            if(is_relative) target = sxt_value(TYPE_WORD, target);
         }
 
         if(is_jsr) {
@@ -429,8 +434,7 @@ Delta BCpu::decode_jump(uint8_t op1) {
     } else { // J*C, J*S
         next.pc += 3;
         uint32_t offset = nbr->readw(state.pc+1);
-        if(offset & 0x00008000) offset |= 0xFFFF0000; //sign extend
-
+        offset = sxt_value(TYPE_WORD, offset);
         if(state.read_flag((Flag) (op1 & 0x07)) == (bool)(op1 & 0x08)){
             next.pc += offset;
         }
