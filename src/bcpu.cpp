@@ -512,7 +512,7 @@ Delta BCpu::decode_arithmetic(uint8_t op1) {
             case AND:
                 wb = v1 & v2;
                 break;
-            case OR:
+            case IOR:
                 wb = v1 | v2;
                 break;
             case XOR:

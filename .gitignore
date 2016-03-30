@@ -3,3 +3,6 @@
 *.so
 *.dblite
 gtest
+basm
+out
+in.txt
