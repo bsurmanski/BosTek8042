@@ -11,11 +11,15 @@
 #include <string>
 #include <iostream>
 
+#include "io/string.hpp"
+#include "io/input.hpp"
+#include "io/file.hpp"
+
 #define STATUS_BYTE 8
 
 struct Params {
-    std::vector<std::string> input;
-    std::string output;
+    std::vector<String> input;
+    String output;
 };
 
 /*
@@ -54,7 +58,7 @@ struct Value {
     }
 };
 
-std::map<std::string, Value> symbols;
+std::map<String, Value> symbols;
 
 const char *arith_binary[] = {
     "ADD",
@@ -108,18 +112,12 @@ const char *ctrl_unary[] = {
     NULL,
 };
 
-char fpeek(FILE *in) {
-    char c = fgetc(in);
-    if(!feof(in)) fseek(in, -1, SEEK_CUR);
-    return c;
-}
-
-int read_identifier(FILE *in, char *dst, int max) {
+int read_identifier(Input *in, char *dst, int max) {
     int i = 0;
     char c;
 
     dst[max-1] = '\0';
-    while(!feof(in) && isalpha(c = fgetc(in))) {
+    while(!in->eof() && isalpha(c = in->get())) {
         if(i < max-1) dst[i] = c;
         i++;
     }
@@ -144,7 +142,7 @@ Bostek::Cpu::Type char_to_type(char c) {
     }
 }
 
-void read_mnemonic(FILE *in, OpEncode *enc) {
+void read_mnemonic(Input *in, OpEncode *enc) {
     read_identifier(in, enc->mnemonic, 5);
 }
 
@@ -157,34 +155,34 @@ int index_in_list(OpEncode *enc, const char **lst) {
     return -1;
 }
 
-bool next_is_value(FILE *in) {
-    char c = fpeek(in);
-    while(!feof(in) && (isspace(c) && c != '\n')) {
-        fgetc(in);
-        c = fpeek(in);
+bool next_is_value(Input *in) {
+    char c = in->peek();
+    while(!in->eof() && (isspace(c) && c != '\n')) {
+        in->get();
+        c = in->peek();
     }
 
-    if(feof(in)) return false;
+    if(in->eof()) return false;
     if(c == ';') return false;
     if(c == '\n') return false;
     return c == '$' || c == '-' || isalnum(c);
 }
 
-Value read_value(FILE *in) {
+Value read_value(Input *in) {
     // ignore '#' for decimal numbers
     uint64_t val = 0;
     bool negative = false;
-    char c = fpeek(in);
+    char c = in->peek();
 
     if(c == '-') {
         negative = true;
-        fgetc(in);
-        c = fpeek(in);
+        in->get();
+        c = in->peek();
     }
 
     if(c == '#') {
-        fgetc(in);
-        c = fpeek(in);
+        in->get();
+        c = in->peek();
     }
 
     if(isalpha(c)) { // is symbol
@@ -198,7 +196,7 @@ Value read_value(FILE *in) {
 
         return symbols[sym];
     } else if(isdigit(c)) { // is decimal number
-        while(!feof(in) && !isspace(c) && c != ';') {
+        while(!in->eof() && !isspace(c) && c != ';') {
             if(!isdigit(c)) {
                 printf("invalid decimal value\n");
                 exit(-1);
@@ -207,13 +205,13 @@ Value read_value(FILE *in) {
             val *= 10;
             val += (c - '0');
 
-            fgetc(in);
-            c = fpeek(in);
+            in->get();
+            c = in->peek();
         }
     } else if(c == '$') { // is hex number
-        fgetc(in);
-        c = fpeek(in);
-        while(!feof(in) && !isspace(c) && c != ';') {
+        in->get();
+        c = in->peek();
+        while(!in->eof() && !isspace(c) && c != ';') {
             if(!isxdigit(c)) {
                 printf("invalid hex value\n");
                 exit(-1);
@@ -222,8 +220,8 @@ Value read_value(FILE *in) {
             val <<= 4;
             val += (c - '0');
 
-            fgetc(in);
-            c = fpeek(in);
+            in->get();
+            c = in->peek();
         }
     } else if(c == '\'') { // is ascii character
     }
@@ -247,7 +245,7 @@ Value read_value(FILE *in) {
     }
 }
 
-void process_op(uint8_t *mem, FILE *in, uint32_t *pc) {
+void process_op(uint8_t *mem, Input *in, uint32_t *pc) {
     OpEncode enc;
     read_mnemonic(in, &enc);
 
@@ -412,7 +410,7 @@ void process_op(uint8_t *mem, FILE *in, uint32_t *pc) {
         uint8_t opcode = 0x80 + 8 * i;
 
         Bostek::Cpu::Type type;
-        switch(enc.mnemonic[4]) {
+        switch(enc.mnemonic[3]) {
             case 'B':
                 type = Bostek::Cpu::TYPE_BYTE;
                 break;
@@ -429,7 +427,7 @@ void process_op(uint8_t *mem, FILE *in, uint32_t *pc) {
                 opcode += 3;
                 break;
             default:
-                printf("invalid binary mnemonic. expected size\n");
+                printf("invalid binary mnemonic '%s'. expected size\n", enc.mnemonic);
                 exit(-1);
         }
 
@@ -518,26 +516,26 @@ void process_op(uint8_t *mem, FILE *in, uint32_t *pc) {
     }
 }
 
-void parse_file(uint8_t *mem, FILE *in) {
+void parse_file(uint8_t *mem, Input *in) {
     uint32_t pc = 0x1000;
     char c;
-    while(!feof(in)) {
+    while(!in->eof()) {
         if(c == '.') {
             // special
         } else if(isspace(c)) {
-            fgetc(in);
-            c = fpeek(in);
+            in->get();
+            c = in->peek();
         } else if(c == ';') {
-            while(!feof(in) && c != '\n') {
-                fgetc(in);
-                c = fpeek(in);
+            while(!in->eof() && c != '\n') {
+                in->get();
+                c = in->peek();
             }
         } else {
             printf("%x\n", c);
             process_op(mem, in, &pc);
         }
-        fgetc(in);
-        c = fpeek(in);
+        in->get();
+        c = in->peek();
     }
 }
 
@@ -583,9 +581,8 @@ int main(int argc, char **argv) {
 
     uint8_t *mem = (uint8_t*) malloc(0x10000);
     for(int i = 0; i < p.input.size(); i++) {
-        FILE *f = fopen(p.input[i].c_str(), "r");
-        parse_file(mem, f);
-        fclose(f);
+        File f(p.input[i]);
+        parse_file(mem, &f);
     }
 
     FILE *output = fopen(p.output.c_str(), "w");

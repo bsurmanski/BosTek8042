@@ -6,7 +6,12 @@ env.VariantDir('build/test', 'test', duplicate=0)
 srcs = ['cpu.cpp',
         'bcpu.cpp',
         'northBridge.cpp',
-        'memory.cpp']
+        'memory.cpp',
+        'io/file.cpp',
+        'io/char.cpp',
+        'io/exception.cpp',
+        'io/string.cpp',
+        'io/stringInput.cpp']
 asm_srcs = [
             'asm.cpp',
         ]
