@@ -114,12 +114,14 @@ const char *ctrl_unary[] = {
 
 int read_identifier(Input *in, char *dst, int max) {
     int i = 0;
-    char c;
+    char c = in->peek();
 
     dst[max-1] = '\0';
-    while(!in->eof() && isalpha(c = in->get())) {
+    while(!in->eof() && isalpha(c)) {
+        in->get();
         if(i < max-1) dst[i] = c;
         i++;
+        c = in->peek();
     }
 
     if(i < max) dst[i] = '\0';
@@ -139,6 +141,19 @@ Bostek::Cpu::Type char_to_type(char c) {
         default:
             printf("invalid size character.\n");
             exit(-1);
+    }
+}
+
+void write_constant(uint8_t *mem, uint32_t *pc, Bostek::Cpu::Type type, uint32_t val) {
+    mem[(*pc)++] = val & 0xFF;
+
+    if(type >= Bostek::Cpu::TYPE_WORD) {
+        mem[(*pc)++] = (val >> 8) & 0xFF;
+    }
+
+    if(type >= Bostek::Cpu::TYPE_LONG) {
+        mem[(*pc)++] = (val >> 16) & 0xFF;
+        mem[(*pc)++] = (val >> 24) & 0xFF;
     }
 }
 
@@ -172,6 +187,9 @@ Value read_value(Input *in) {
     // ignore '#' for decimal numbers
     uint64_t val = 0;
     bool negative = false;
+
+    while(in->peek() == ' ' && !in->eof()) in->get();
+
     char c = in->peek();
 
     if(c == '-') {
@@ -211,7 +229,7 @@ Value read_value(Input *in) {
     } else if(c == '$') { // is hex number
         in->get();
         c = in->peek();
-        while(!in->eof() && !isspace(c) && c != ';') {
+        while(!in->eof() && !isspace(c) && c != '+' && c != ';') {
             if(!isxdigit(c)) {
                 printf("invalid hex value\n");
                 exit(-1);
@@ -307,9 +325,75 @@ void process_op(uint8_t *mem, Input *in, uint32_t *pc) {
             exit(-1);
         }
     } else if (!strncmp(enc.mnemonic, "LOD", 3)) {
-        //TODO: relative load
+        Value dst = read_value(in);
+        Value base = read_value(in);
+        uint16_t rel_addr = base.val - ((*pc) + 3);
+        Bostek::Cpu::Type type = char_to_type(enc.mnemonic[3]);
+
+        if(!dst.is_register()) {
+            printf("load destination must be register\n");
+            exit(-1);
+        }
+
+        if(base.is_register()) {
+            printf("load base must be constant\n");
+            exit(-1);
+        }
+
+        // relative load
+        if(in->peek() == '+') {
+            in->get();
+            Value offset = read_value(in);
+            if(!offset.is_register()) {
+                printf("load offset must be register\n");
+                exit(-1);
+            }
+            mem[(*pc)++] = 0x20 + (uint8_t) type;
+            mem[(*pc)++] = ((offset.val << 4) & 0xF0) | (dst.val & 0x0F);
+
+            write_constant(mem, pc, Bostek::Cpu::TYPE_WORD, rel_addr);
+        } else {
+            mem[(*pc)++] = 0x10 + (uint8_t) type;
+            mem[(*pc)++] = dst.val & 0x0F;
+            write_constant(mem, pc, Bostek::Cpu::TYPE_WORD, rel_addr);
+        }
     } else if (!strncmp(enc.mnemonic, "STO", 3)) {
-        //TODO: relative store
+        Value base = read_value(in);
+        uint16_t rel_addr = base.val - ((*pc) + 3);
+        Bostek::Cpu::Type type = char_to_type(enc.mnemonic[3]);
+
+
+        if(base.is_register()) {
+            printf("load base must be constant\n");
+            exit(-1);
+        }
+
+        // relative load
+        if(in->peek() == '+') {
+            in->get();
+            Value offset = read_value(in);
+            Value src = read_value(in);
+            if(!offset.is_register()) {
+                printf("load offset must be register\n");
+                exit(-1);
+            }
+            if(!src.is_register()) {
+                printf("load destination must be register\n");
+                exit(-1);
+            }
+            mem[(*pc)++] = 0x28 + (uint8_t) type;
+            mem[(*pc)++] = ((offset.val << 4) & 0xF0) | (src.val & 0x0F);
+            write_constant(mem, pc, Bostek::Cpu::TYPE_WORD, rel_addr);
+        } else {
+            Value src = read_value(in);
+            if(!src.is_register()) {
+                printf("load destination must be register\n");
+                exit(-1);
+            }
+            mem[(*pc)++] = 0x18 + (uint8_t) type;
+            mem[(*pc)++] = src.val & 0x0F;
+            write_constant(mem, pc, Bostek::Cpu::TYPE_WORD, rel_addr);
+        }
     } else if (!strncmp(enc.mnemonic, "MOV", 3)) {
         Value v1 = read_value(in);
         Value v2 = read_value(in);
@@ -340,17 +424,7 @@ void process_op(uint8_t *mem, Input *in, uint32_t *pc) {
         } else {
             mem[(*pc)++] = 0x34 + (uint8_t) type;
             mem[(*pc)++] = 0x0F & v1.val;
-
-            mem[(*pc)++] = v1.val & 0xFF;
-
-            if(type >= Bostek::Cpu::TYPE_WORD) {
-                mem[(*pc)++] = (v1.val >> 8) & 0xFF;
-            }
-
-            if(type >= Bostek::Cpu::TYPE_LONG) {
-                mem[(*pc)++] = (v1.val >> 16) & 0xFF;
-                mem[(*pc)++] = (v1.val >> 24) & 0xFF;
-            }
+            write_constant(mem, pc, type, v1.val);
         }
     } else if (!strncmp(enc.mnemonic, "PSH", 3)) {
         uint8_t opcode = 0x4C;
@@ -367,16 +441,7 @@ void process_op(uint8_t *mem, Input *in, uint32_t *pc) {
             mem[(*pc)++] = 0x4E;
             Bostek::Cpu::Type type = char_to_type(enc.mnemonic[3]);
             mem[(*pc)++] = 0xF0 & (((uint8_t) type) << 4);
-            mem[(*pc)++] = v1.val & 0xFF;
-
-            if(type >= Bostek::Cpu::TYPE_WORD) {
-                mem[(*pc)++] = (v1.val >> 8) & 0xFF;
-            }
-
-            if(type >= Bostek::Cpu::TYPE_LONG) {
-                mem[(*pc)++] = (v1.val >> 16) & 0xFF;
-                mem[(*pc)++] = (v1.val >> 24) & 0xFF;
-            }
+            write_constant(mem, pc, type, v1.val);
         }
     } else if (!strncmp(enc.mnemonic, "POP", 3)) {
         uint8_t opcode = 0x48;
@@ -450,16 +515,7 @@ void process_op(uint8_t *mem, Input *in, uint32_t *pc) {
                 exit(-1);
             }
             printf("v2: %d\n", v2.val);
-            mem[(*pc)++] = v2.val & 0xFF;
-
-            if (type >= Bostek::Cpu::TYPE_WORD) {
-                mem[(*pc)++] = (v2.val >> 8) & 0xFF;
-            }
-
-            if(type >= Bostek::Cpu::TYPE_LONG) {
-                mem[(*pc)++] = (v2.val >> 16) & 0xFF;
-                mem[(*pc)++] = (v2.val >> 24) & 0xFF;
-            }
+            write_constant(mem, pc, type, v2.val);
         }
     } else if((i = index_in_list(&enc, arith_unary)) >= 0) {
         uint8_t opcode = 0xF0 + i;
@@ -518,7 +574,7 @@ void process_op(uint8_t *mem, Input *in, uint32_t *pc) {
 
 void parse_file(uint8_t *mem, Input *in) {
     uint32_t pc = 0x1000;
-    char c;
+    char c = in->peek();
     while(!in->eof()) {
         if(c == '.') {
             // special
@@ -531,7 +587,7 @@ void parse_file(uint8_t *mem, Input *in) {
                 c = in->peek();
             }
         } else {
-            printf("%x\n", c);
+            printf("%c\n", c);
             process_op(mem, in, &pc);
         }
         in->get();

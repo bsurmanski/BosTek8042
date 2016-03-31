@@ -101,6 +101,8 @@ int File::get() {
 int File::peek(int ahead) {
     int c = -1;
 
+    if(eof()) return c;
+
     if(ahead) {
         fseek(fp, ahead, SEEK_CUR);
         c = fgetc(fp);
