@@ -272,8 +272,6 @@ Delta BCpu::decode_move(uint8_t op1) {
                 addr += offset;
             }
         }
-        printf("%x\n", addr);
-
         if(store) {
             wb_type = type;
             wb_addr = addr;

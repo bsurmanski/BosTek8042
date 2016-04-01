@@ -150,6 +150,41 @@ TEST_F(BCpuTest, LOD) {
     EXPECT_EQ(e.next.readw_register(REG_B), 0x3412);
 }
 
+TEST_F(BCpuTest, STO) {
+    Delta e;
+    cpu->state.writew_register(REG_B, 0x1234);
+    e = Execute(TestOp(STOB_RK, 0x01, 0xfc, 0x0f));
+    EXPECT_EQ(e.wb_type, Bostek::Cpu::TYPE_BYTE);
+    EXPECT_EQ(e.wb_addr, 0x2000);
+    EXPECT_EQ(e.wb_value, 0x34);
+
+    cpu->state.writew_register(REG_B, 0x5678);
+    e = Execute(TestOp(STOW_RK, 0x01, 0xfc, 0x0f));
+    EXPECT_EQ(e.wb_type, Bostek::Cpu::TYPE_WORD);
+    EXPECT_EQ(e.wb_addr, 0x2004);
+    EXPECT_EQ(e.wb_value, 0x5678);
+
+    cpu->state.writel_register(REG_B, 0x12345678);
+    e = Execute(TestOp(STOL_RK, 0x01, 0xfc, 0x0f));
+    EXPECT_EQ(e.wb_type, Bostek::Cpu::TYPE_LONG);
+    EXPECT_EQ(e.wb_addr, 0x2008);
+    EXPECT_EQ(e.wb_value, 0x12345678);
+
+    cpu->state.writel_register(REG_C, 0xFFFF0002);
+    cpu->state.writel_register(REG_B, 0xABCD);
+    e = Execute(TestOp(STOW_RRK, 0x21, 0xfc, 0x0f));
+    EXPECT_EQ(e.wb_type, Bostek::Cpu::TYPE_WORD);
+    EXPECT_EQ(e.wb_addr, 0x200E);
+    EXPECT_EQ(e.wb_value, 0xABCD);
+
+    cpu->state.writew_register(REG_C, 0xFFFA);
+    cpu->state.writel_register(REG_B, 0xABCD);
+    e = Execute(TestOp(STOW_RRK, 0x21, 0xfc, 0x0f));
+    EXPECT_EQ(e.wb_type, Bostek::Cpu::TYPE_WORD);
+    EXPECT_EQ(e.wb_addr, 0x200A);
+    EXPECT_EQ(e.wb_value, 0xABCD);
+}
+
 TEST_F(BCpuTest, MOV) {
     Delta e;
     e = Execute(TestOp(MOVB_RK, REG_A, 0x21));
