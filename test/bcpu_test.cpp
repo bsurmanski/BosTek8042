@@ -114,6 +114,42 @@ TEST_F(BCpuTest, ORSB_ANSB_XRSB) {
     EXPECT_EQ(e.next.sb, 0x50);
 }
 
+TEST_F(BCpuTest, LOD) {
+    uint8_t test_data[] = {
+        0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xff
+    };
+
+    mem->fill(0x2000, sizeof(test_data), test_data);
+
+    Delta e;
+    e = Execute(TestOp(LODB_RK, 0x01, 0xfc, 0x0f));
+    EXPECT_EQ(e.next.readb_register(REG_B), 0x12);
+
+    e = Execute(TestOp(LODB_RK, 0x01, 0xfc, 0x0f));
+    EXPECT_EQ(e.next.readb_register(REG_B), 0x9a);
+
+    e = Execute(TestOp(LODW_RK, 0x01, 0xf8, 0x0f));
+    EXPECT_EQ(e.next.readw_register(REG_B), 0xbc9a);
+
+    e = Execute(TestOp(LODL_RK, 0x01, 0xf4, 0x0f));
+    EXPECT_EQ(e.next.readl_register(REG_B), 0xffdebc9a);
+
+    cpu->state.writew_register(REG_C, 0x03);
+    e = Execute(TestOp(LODB_RRK, 0x21, 0xec, 0x0f));
+    EXPECT_EQ(e.next.readb_register(REG_B), 0x78);
+
+    // offset is always word
+    cpu->state.writel_register(REG_C, 0x12340004);
+    e = Execute(TestOp(LODB_RRK, 0x21, 0xe8, 0x0f));
+    EXPECT_EQ(e.next.readb_register(REG_B), 0x9a);
+
+    // test negative
+    cpu->state.writel_register(REG_C, 0x1234FFDC);
+    cpu->state.pc = 0x2020;
+    e = Execute(TestOp(LODW_RRK, 0x21, 0x00, 0x00));
+    EXPECT_EQ(e.next.readw_register(REG_B), 0x3412);
+}
+
 TEST_F(BCpuTest, MOV) {
     Delta e;
     e = Execute(TestOp(MOVB_RK, REG_A, 0x21));

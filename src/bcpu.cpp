@@ -249,7 +249,52 @@ Delta BCpu::decode_move(uint8_t op1) {
     uint32_t wb_value = 0; // used for PSH/POP
 
     if(op1 <= LSTOF_RRK) { // load/store
-        //TODO
+        bool store = op1 & 0x08;
+        bool relative = op1 & 0x20;
+        bool far = op1 & 0x04;
+        Type type = (Type) (op1 & 0x03);
+        uint8_t op2 = nbr->readb(state.pc+1); // registers
+        uint32_t addr;
+
+        if(far) {
+            // relative to next instruction
+            addr = state.pc + 4 + nbr->readl(state.pc+2);
+        } else {
+            // relative to next instruction
+            addr = state.pc + 4 + nbr->readw(state.pc+2);
+        }
+
+        if(relative) {
+            uint16_t offset = state.readw_register((op2 & 0xF0) >> 4);
+            if(offset & sign_mask(TYPE_WORD)) {
+                addr -= abs_value(TYPE_WORD, offset);
+            } else {
+                addr += offset;
+            }
+        }
+        printf("%x\n", addr);
+
+        if(store) {
+            wb_type = type;
+            wb_addr = addr;
+            wb_value = state.read_register(op2 & 0x0F, type);
+        } else { // load
+            switch(type) {
+                default:
+                case TYPE_BYTE:
+                    next.write_register(op2 & 0x0F, type, nbr->readb(addr));
+                    break;
+                case TYPE_WORD:
+                    next.write_register(op2 & 0x0F, type, nbr->readw(addr));
+                    break;
+                case TYPE_LONG:
+                case TYPE_FLOAT:
+                    next.write_register(op2 & 0x0F, type, nbr->readl(addr));
+                    break;
+            }
+        }
+
+        next.pc += 4;
     } else if(op1 <= MOVB_SK) { // move, load constant
         bool mov_to_sb = (op1 & 0x08) && !(op1 & 0x02);
         bool mov_from_sb = (op1 & 0x08) && (op1 & 0x02);
