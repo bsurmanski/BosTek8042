@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include <math.h>
-#include "geom/mat.hpp"
+#include "cpplib/geom/mat.hpp"
 
 TEST(Mat, Create) {
     Mat4 m;

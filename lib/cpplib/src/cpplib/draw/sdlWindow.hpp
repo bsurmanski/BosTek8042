@@ -2,7 +2,7 @@
 #define _DRAW_SDLWINDOW_HPP
 
 #include <SDL/SDL.h>
-#include "common/string.hpp"
+#include "cpplib/common/string.hpp"
 
 class SDLWindow {
     SDL_Surface *screen;

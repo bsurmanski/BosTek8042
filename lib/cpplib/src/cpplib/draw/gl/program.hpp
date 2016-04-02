@@ -1,7 +1,7 @@
 #ifndef _DRAW_GL_PROGRAM
 #define _DRAW_GL_PROGRAM
 
-#include "common/input.hpp"
+#include "cpplib/common/input.hpp"
 
 #include <GL/glew.h>
 #include <GL/gl.h>

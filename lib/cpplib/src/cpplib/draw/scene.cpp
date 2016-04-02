@@ -1,9 +1,9 @@
 #include "scene.hpp"
 
-#include "common/exception.hpp"
-#include "common/file.hpp"
-#include "draw/gl/mdl.hpp"
-#include "draw/tga.hpp"
+#include "cpplib/common/exception.hpp"
+#include "cpplib/common/file.hpp"
+#include "cpplib/draw/gl/mdl.hpp"
+#include "cpplib/draw/tga.hpp"
 
 #include <stdint.h>
 

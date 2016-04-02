@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
-#include "draw/tga.hpp"
-#include "common/file.hpp"
+#include "cpplib/draw/tga.hpp"
+#include "cpplib/common/file.hpp"
 
 TEST(TGA, SimpleRead) {
     File file("tga_simple_test.tga");

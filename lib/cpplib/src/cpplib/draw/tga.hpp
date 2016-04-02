@@ -2,7 +2,8 @@
 #define _DRAW_TGA_HPP
 
 #include "image.hpp"
-#include "common/input.hpp"
+
+#include "cpplib/common/input.hpp"
 
 Image *loadTga(Input &file);
 

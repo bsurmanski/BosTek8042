@@ -1,7 +1,7 @@
 #ifndef _EXCEPTION_HPP
 #define _EXCEPTION_HPP
 
-#include "common/string.hpp"
+#include "cpplib/common/string.hpp"
 #include <exception>
 
 class Exception : public std::exception {

@@ -1,7 +1,7 @@
 #ifndef _INPUT_HPP
 #define _INPUT_HPP
 
-#include "common/string.hpp"
+#include "cpplib/common/string.hpp"
 
 class Input {
     public:

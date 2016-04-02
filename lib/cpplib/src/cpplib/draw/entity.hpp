@@ -1,10 +1,10 @@
 #ifndef _ENTITY_HPP
 #define _ENTITY_HPP
 
-#include "geom/vec.hpp"
-#include "geom/mat.hpp"
-#include "draw/gl/mesh.hpp"
-#include "draw/gl/texture.hpp"
+#include "cpplib/geom/vec.hpp"
+#include "cpplib/geom/mat.hpp"
+#include "cpplib/draw/gl/mesh.hpp"
+#include "cpplib/draw/gl/texture.hpp"
 
 class Entity {
     public:

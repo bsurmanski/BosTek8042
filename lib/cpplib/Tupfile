@@ -1,27 +1,27 @@
 # source files (minus main function)
 
-COMMON=src/common/char.cpp\
-    src/common/exception.cpp\
-    src/common/file.cpp\
-    src/common/object.cpp\
-    src/common/string.cpp
+COMMON=src/cpplib/common/char.cpp\
+    src/cpplib/common/exception.cpp\
+    src/cpplib/common/file.cpp\
+    src/cpplib/common/object.cpp\
+    src/cpplib/common/string.cpp
 
-DRAW=src/draw/camera.cpp\
-    src/draw/gl/framebuffer.cpp\
-    src/draw/gl/mdl.cpp\
-    src/draw/gl/mesh.cpp\
-    src/draw/gl/program.cpp\
-    src/draw/gl/texture.cpp\
-    src/draw/image.cpp\
-    src/draw/scene.cpp\
-    src/draw/sdlWindow.cpp\
-    src/draw/tga.cpp\
-    src/draw/entity.cpp
+DRAW=src/cpplib/draw/camera.cpp\
+    src/cpplib/draw/gl/framebuffer.cpp\
+    src/cpplib/draw/gl/mdl.cpp\
+    src/cpplib/draw/gl/mesh.cpp\
+    src/cpplib/draw/gl/program.cpp\
+    src/cpplib/draw/gl/texture.cpp\
+    src/cpplib/draw/image.cpp\
+    src/cpplib/draw/scene.cpp\
+    src/cpplib/draw/sdlWindow.cpp\
+    src/cpplib/draw/tga.cpp\
+    src/cpplib/draw/entity.cpp
 
-MATH=src/geom/vec.cpp\
-    src/math/random.cpp\
-    src/geom/ball.cpp\
-    src/geom/mat.cpp
+MATH=src/cpplib/geom/vec.cpp\
+    src/cpplib/math/random.cpp\
+    src/cpplib/geom/ball.cpp\
+    src/cpplib/geom/mat.cpp
 
 # test files
 TST=test/ball_test.cpp\
@@ -43,7 +43,7 @@ TESTEXE=test/test.exe
 TEST_LDFLAGS+=-lmingw32
 endif
 
-SAMPLESRC = src/main.cpp
+SAMPLESRC = src/cpplib/main.cpp
 SAMPLEEXE = ggj
 SAMPLE_LDFLAGS = -pthread -lGL -lSDL -lGLEW
 
