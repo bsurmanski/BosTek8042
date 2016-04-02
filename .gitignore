@@ -1,0 +1,7 @@
+test/test
+test/sample
+test/res
+*.o
+*.so
+.tup
+bin
