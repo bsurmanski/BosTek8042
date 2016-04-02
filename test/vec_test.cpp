@@ -2,8 +2,8 @@
 
 #include <math.h>
 
-#include "geom/vec.hpp"
-#include "geom/mat.hpp"
+#include "cpplib/geom/vec.hpp"
+#include "cpplib/geom/mat.hpp"
 
 TEST(Vec, Create) {
     Vec4 a(1, 2, 3);

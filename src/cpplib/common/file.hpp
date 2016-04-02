@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 
-#include "input.hpp"
+#include "cpplib/common/input.hpp"
 
 class File : public Input {
     String filename;

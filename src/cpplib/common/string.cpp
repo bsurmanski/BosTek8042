@@ -1,6 +1,6 @@
-#include "common/char.hpp"
-#include "common/string.hpp"
-#include "common/exception.hpp"
+#include "cpplib/common/char.hpp"
+#include "cpplib/common/string.hpp"
+#include "cpplib/common/exception.hpp"
 
 #include <assert.h>
 #include <stdio.h>

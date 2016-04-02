@@ -1,8 +1,8 @@
 #ifndef _DRAW_CAMERA_HPP
 #define _DRAW_CAMERA_HPP
 
-#include "geom/vec.hpp"
-#include "geom/mat.hpp"
+#include "cpplib/geom/vec.hpp"
+#include "cpplib/geom/mat.hpp"
 
 class Camera {
     Vec4 position;

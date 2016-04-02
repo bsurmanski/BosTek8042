@@ -1,5 +1,5 @@
-#include "draw/sdlWindow.hpp"
-#include "draw/gl/drawDevice.hpp"
+#include "cpplib/draw/sdlWindow.hpp"
+#include "cpplib/draw/gl/drawDevice.hpp"
 #include <SDL/SDL.h>
 
 #include <unistd.h>

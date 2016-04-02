@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "geom/ball.hpp"
+#include "cpplib/geom/ball.hpp"
 
 TEST(Ball, Collide) {
     Ball b1(1, 0, 0, 1);

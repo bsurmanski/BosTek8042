@@ -4,8 +4,9 @@
 #include <GL/glew.h>
 #include <GL/gl.h>
 
-#include "draw/tga.hpp"
-#include "draw/image.hpp"
+#include "cpplib/draw/tga.hpp"
+#include "cpplib/draw/image.hpp"
+
 #include "framebuffer.hpp"
 
 namespace GL {

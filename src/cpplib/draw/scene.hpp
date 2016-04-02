@@ -1,13 +1,12 @@
 #ifndef _DRAW_SCENE_HPP
 #define _DRAW_SCENE_HPP
 
-#include "common/input.hpp"
-#include "common/string.hpp"
-#include "draw/gl/mesh.hpp"
-#include "draw/gl/texture.hpp"
-#include "draw/entity.hpp"
-
-#include "geom/mat.hpp"
+#include "cpplib/common/input.hpp"
+#include "cpplib/common/string.hpp"
+#include "cpplib/draw/gl/mesh.hpp"
+#include "cpplib/draw/gl/texture.hpp"
+#include "cpplib/draw/entity.hpp"
+#include "cpplib/geom/mat.hpp"
 
 #include <map>
 #include <vector>
