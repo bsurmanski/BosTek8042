@@ -1,7 +1,7 @@
 #ifndef _BOSTEK_CPU_HPP
 #define _BOSTEK_CPU_HPP
 
-#include "object.hpp"
+#include "cpplib/common/object.hpp"
 #include "northBridge.hpp"
 
 #include <stdint.h>

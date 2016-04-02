@@ -11,9 +11,8 @@
 #include <string>
 #include <iostream>
 
-#include "io/string.hpp"
-#include "io/input.hpp"
-#include "io/file.hpp"
+#include "cpplib/common/string.hpp"
+#include "cpplib/common/file.hpp"
 
 #define STATUS_BYTE 8
 

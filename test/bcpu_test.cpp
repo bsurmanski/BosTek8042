@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 
-#include "../src/bcpu.hpp"
-#include "../src/memory.hpp"
-#include "../src/northBridge.hpp"
+#include "../src/bostek/bcpu.hpp"
+#include "../src/bostek/memory.hpp"
+#include "../src/bostek/northBridge.hpp"
 
 namespace Bostek {
 namespace Cpu {

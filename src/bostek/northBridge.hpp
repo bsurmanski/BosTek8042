@@ -2,7 +2,7 @@
 #define _BOSTEK_NORTH_BRIDGE_HPP
 
 #include <stdint.h>
-#include "object.hpp"
+#include "cpplib/common/object.hpp"
 
 class Cpu;
 class Memory;

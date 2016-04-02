@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#include "object.hpp"
+#include "cpplib/common/object.hpp"
 
 class Memory : public Object {
     int size;
