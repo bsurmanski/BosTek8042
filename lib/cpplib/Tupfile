@@ -1,0 +1,72 @@
+# source files (minus main function)
+
+COMMON=src/common/char.cpp\
+    src/common/exception.cpp\
+    src/common/file.cpp\
+    src/common/object.cpp\
+    src/common/string.cpp
+
+DRAW=src/draw/camera.cpp\
+    src/draw/gl/framebuffer.cpp\
+    src/draw/gl/mdl.cpp\
+    src/draw/gl/mesh.cpp\
+    src/draw/gl/program.cpp\
+    src/draw/gl/texture.cpp\
+    src/draw/image.cpp\
+    src/draw/scene.cpp\
+    src/draw/sdlWindow.cpp\
+    src/draw/tga.cpp\
+    src/draw/entity.cpp
+
+MATH=src/geom/vec.cpp\
+    src/math/random.cpp\
+    src/geom/ball.cpp\
+    src/geom/mat.cpp
+
+# test files
+TST=test/ball_test.cpp\
+    test/vec_test.cpp\
+    test/tga_test.cpp\
+    test/mat_test.cpp\
+    test/string_test.cpp
+
+CXXFLAGS=-Isrc -g -O0 -fPIC
+LDFLAGS=-shared -lGL -lSDL -lGLEW
+EXE=bslib.so
+TESTEXE=test/test
+TEST_LDFLAGS=-lgtest -lgtest_main -pthread -lGL -lSDL -lGLEW
+
+ifeq (@(TUP_PLATFORM),win32)
+LDFLAGS+=-lmingw32
+EXE=bslib.exe
+TESTEXE=test/test.exe
+TEST_LDFLAGS+=-lmingw32
+endif
+
+SAMPLESRC = src/main.cpp
+SAMPLEEXE = ggj
+SAMPLE_LDFLAGS = -pthread -lGL -lSDL -lGLEW
+
+
+# compile source files into .o files
+: foreach $(COMMON) |> g++ -c $(CXXFLAGS) %f -o %o |> build/%B.o {COMMON_O}
+: foreach $(DRAW) |> g++ -c $(CXXFLAGS) %f -o %o |> build/%B.o {DRAW_O}
+: foreach $(MATH) |> g++ -c $(CXXFLAGS) %f -o %o |> build/%B.o {MATH_O}
+
+# compile test files into .o files
+: foreach $(TST) |> g++ -c $(CXXFLAGS) %f -o %o |> build/test/%B.o {TEST_O}
+
+# compile objects into library
+: {COMMON_O} |> ar rcs %o %f |> bin/cpplib_common.a {COMMON_A}
+
+# compile objects into library
+: {DRAW_O} {COMMON_O} |> ar rcs %o %f |> bin/cpplib_draw.a {DRAW_A}
+
+# compile objects into library
+: {MATH_O} {COMMON_O} |> ar rcs %o %f |> bin/cpplib_math.a {MATH_A}
+
+# compile objects into library
+: {COMMON_O} {MATH_O} {DRAW_O} |> ar rcs %o %f |> bin/cpplib.a {CPPLIB_A}
+
+# compile objects into test executable
+: {TEST_O} {CPPLIB_A} |> g++ %f -o $(TESTEXE) $(TEST_LDFLAGS) |> $(TESTEXE)
