@@ -58,6 +58,7 @@ struct Value {
     }
 };
 
+int line = 0;
 std::map<String, Value> symbols;
 
 const char *arith_binary[] = {
@@ -112,6 +113,11 @@ const char *ctrl_unary[] = {
     NULL,
 };
 
+void error(const char *msg) {
+    printf("line %d: %s\n", line, msg);
+    exit(-1);
+}
+
 int read_identifier(Input *in, char *dst, int max) {
     int i = 0;
     char c = in->peek();
@@ -139,8 +145,7 @@ Bostek::Cpu::Type char_to_type(char c) {
         case 'F':
             return Bostek::Cpu::TYPE_FLOAT;
         default:
-            printf("invalid size character.\n");
-            exit(-1);
+            error("invalid size character.");
     }
 }
 
@@ -216,8 +221,7 @@ Value read_value(Input *in) {
     } else if(isdigit(c)) { // is decimal number
         while(!in->eof() && !isspace(c) && c != ';') {
             if(!isdigit(c)) {
-                printf("invalid decimal value\n");
-                exit(-1);
+                error("invalid decimal value");
             }
 
             val *= 10;
@@ -231,7 +235,7 @@ Value read_value(Input *in) {
         c = in->peek();
         while(!in->eof() && !isspace(c) && c != '+' && c != ';') {
             if(!isxdigit(c)) {
-                printf("invalid hex value\n");
+                error("invalid hex value");
                 exit(-1);
             }
 
@@ -251,14 +255,13 @@ Value read_value(Input *in) {
     }
 
     if(absv < 0xFF || (absv <= 0xFF && !negative)) {
-        printf("bvalue: %d\n", val);
         return Value(Bostek::Cpu::TYPE_BYTE, val);
     } else if(absv < 0xFFFF || (absv <= 0xFFFF && !negative)) {
         return Value(Bostek::Cpu::TYPE_WORD, val);
     } else if(absv < 0xFFFFFFF || (absv <= 0xFFFFFFF && !negative)) {
         return Value(Bostek::Cpu::TYPE_LONG, val);
     } else {
-        printf("value too large\n");
+        error("value too large");
         exit(-1);
     }
 }
@@ -271,8 +274,7 @@ void process_op(uint8_t *mem, Input *in, uint32_t *pc) {
     if(enc.mnemonic[0] == 'J') {
         Value target = read_value(in);
         if(target.type == Bostek::Cpu::TYPE_NONE) {
-            printf("jump target must be label or constant; not register\n");
-            exit(-1);
+            error("jump target must be label or constant; not register");
         }
 
         if(!strncmp(enc.mnemonic, "JMP", 3)) {
@@ -327,17 +329,15 @@ void process_op(uint8_t *mem, Input *in, uint32_t *pc) {
     } else if (!strncmp(enc.mnemonic, "LOD", 3)) {
         Value dst = read_value(in);
         Value base = read_value(in);
-        uint16_t rel_addr = base.val - ((*pc) + 3);
+        uint16_t rel_addr = base.val - ((*pc) + 4);
         Bostek::Cpu::Type type = char_to_type(enc.mnemonic[3]);
 
         if(!dst.is_register()) {
-            printf("load destination must be register\n");
-            exit(-1);
+            error("load destination must be register");
         }
 
         if(base.is_register()) {
-            printf("load base must be constant\n");
-            exit(-1);
+            error("load base must be constant");
         }
 
         // relative load
@@ -345,8 +345,7 @@ void process_op(uint8_t *mem, Input *in, uint32_t *pc) {
             in->get();
             Value offset = read_value(in);
             if(!offset.is_register()) {
-                printf("load offset must be register\n");
-                exit(-1);
+                error("load offset must be register");
             }
             mem[(*pc)++] = 0x20 + (uint8_t) type;
             mem[(*pc)++] = ((offset.val << 4) & 0xF0) | (dst.val & 0x0F);
@@ -359,13 +358,12 @@ void process_op(uint8_t *mem, Input *in, uint32_t *pc) {
         }
     } else if (!strncmp(enc.mnemonic, "STO", 3)) {
         Value base = read_value(in);
-        uint16_t rel_addr = base.val - ((*pc) + 3);
+        uint16_t rel_addr = base.val - ((*pc) + 4);
         Bostek::Cpu::Type type = char_to_type(enc.mnemonic[3]);
 
 
         if(base.is_register()) {
-            printf("load base must be constant\n");
-            exit(-1);
+            error("store base must be constant");
         }
 
         // relative load
@@ -374,12 +372,10 @@ void process_op(uint8_t *mem, Input *in, uint32_t *pc) {
             Value offset = read_value(in);
             Value src = read_value(in);
             if(!offset.is_register()) {
-                printf("load offset must be register\n");
-                exit(-1);
+                error("store offset must be register");
             }
             if(!src.is_register()) {
-                printf("load destination must be register\n");
-                exit(-1);
+                error("store source must be register");
             }
             mem[(*pc)++] = 0x28 + (uint8_t) type;
             mem[(*pc)++] = ((offset.val << 4) & 0xF0) | (src.val & 0x0F);
@@ -387,8 +383,7 @@ void process_op(uint8_t *mem, Input *in, uint32_t *pc) {
         } else {
             Value src = read_value(in);
             if(!src.is_register()) {
-                printf("load destination must be register\n");
-                exit(-1);
+                error("store source must be register");
             }
             mem[(*pc)++] = 0x18 + (uint8_t) type;
             mem[(*pc)++] = src.val & 0x0F;
@@ -400,14 +395,12 @@ void process_op(uint8_t *mem, Input *in, uint32_t *pc) {
         Bostek::Cpu::Type type = char_to_type(enc.mnemonic[3]);
 
         if(!v1.is_register()) {
-            printf("first op to MOV must be register\n");
-            exit(-1);
+            error("first op to MOV must be register");
         }
 
         if(v1.val == STATUS_BYTE && v2.is_register()) {
             if(v2.val == STATUS_BYTE) {
-                printf("cannot move SB to SB\n");
-                exit(-1);
+                error("cannot move SB to SB");
             }
             mem[(*pc)++] = 0x38;
             mem[(*pc)++] = 0xF0 & (v2.val << 4);
@@ -466,7 +459,7 @@ void process_op(uint8_t *mem, Input *in, uint32_t *pc) {
         Value v2 = read_value(in);
 
         if(!v1.is_register() || !v2.is_register()) {
-            printf("both ops to SWP must be registers\n");
+            error("both ops to SWP must be registers");
         }
 
         mem[(*pc)++] = opcode;
@@ -500,7 +493,7 @@ void process_op(uint8_t *mem, Input *in, uint32_t *pc) {
         Value v2 = read_value(in);
 
         if(!v1.is_register()) {
-            printf("first value of binary arithmetic must be register\n");
+            error("first value of binary arithmetic must be register");
             exit(-1);
         }
 
@@ -511,10 +504,8 @@ void process_op(uint8_t *mem, Input *in, uint32_t *pc) {
             mem[(*pc)++] = opcode + 8;
             mem[(*pc)++] = v1.val & 0x0F;
             if(v2.type > type) {
-                printf("constant too large in binary arithmetic\n");
-                exit(-1);
+                error("constant too large in binary arithmetic");
             }
-            printf("v2: %d\n", v2.val);
             write_constant(mem, pc, type, v2.val);
         }
     } else if((i = index_in_list(&enc, arith_unary)) >= 0) {
@@ -536,13 +527,11 @@ void process_op(uint8_t *mem, Input *in, uint32_t *pc) {
                 type = Bostek::Cpu::TYPE_FLOAT;
                 break;
             default:
-                printf("invalid unary arithmetic mnemonic. expected size\n");
-                exit(-1);
+                error("invalid unary arithmetic mnemonic. expected size");
         }
 
         if(!v1.is_register()) {
-            printf("operand of unary expected to be register\n");
-            exit(-1);
+            error("operand of unary expected to be register");
         }
 
         mem[(*pc)++] = opcode;
@@ -562,8 +551,7 @@ void process_op(uint8_t *mem, Input *in, uint32_t *pc) {
         mem[(*pc)++] = 0x07;
         Value v1 = read_value(in);
         if(!v1.is_register()) {
-            printf("expected register for CPUB");
-            exit(-1);
+            error("expected register for CPUB");
         }
         mem[(*pc)++] = v1.val & 0xFF;
     } else {
@@ -572,13 +560,24 @@ void process_op(uint8_t *mem, Input *in, uint32_t *pc) {
     }
 }
 
+void process_special(uint8_t *mem, Input *in, uint32_t *pc) {
+    in->get();
+    char id[9];
+    read_identifier(in, id, 9);
+    if(!strncmp(id, "ORG", 4)) {
+        Value v = read_value(in);
+        *pc = v.val;
+    }
+}
+
 void parse_file(uint8_t *mem, Input *in) {
     uint32_t pc = 0x1000;
     char c = in->peek();
     while(!in->eof()) {
         if(c == '.') {
-            // special
+            process_special(mem, in, &pc);
         } else if(isspace(c)) {
+            if(c == '\n') line++;
             in->get();
             c = in->peek();
         } else if(c == ';') {
@@ -587,7 +586,6 @@ void parse_file(uint8_t *mem, Input *in) {
                 c = in->peek();
             }
         } else {
-            printf("%c\n", c);
             process_op(mem, in, &pc);
         }
         in->get();
@@ -613,8 +611,7 @@ Params parse_params(int argc, char **argv) {
         }
     }
     if(params.output.empty()) {
-        printf("expect output file");
-        exit(-1);
+        error("expect output file");
     }
     return params;
 }
