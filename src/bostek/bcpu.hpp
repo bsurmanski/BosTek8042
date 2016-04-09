@@ -7,10 +7,10 @@ namespace Bostek {
 namespace Cpu {
 enum OpCodes {
     NOP=0x00, HLT, WFI, RET, RFI, IRQ, NMI, CPUB, ANSB_R=0x08, ORSB_R, XRSB_R, ANSB_K=0x0C, ORSB_K, XRSB_K,
-    LODB_RK=0x10, LODW_RK, LODL_RK, LODF_RK, LLODB_RK, LLODW_RK, LLODL_RK, LLODF_RK, STOB_RK, STOW_RK, STOL_RK, STOF_RK, LSTOB_RK, LSTOW_RK, LSTOL_RK, LSTOF_RK,
-    LODB_RRK=0x20, LODW_RRK, LODL_RRK, LODF_RRK, LLODB_RRK, LLODW_RRK, LLODL_RRK, LLODF_RRK, STOB_RRK, STOW_RRK, STOL_RRK, STOF_RRK, LSTOB_RRK, LSTOW_RRK, LSTOL_RRK, LSTOF_RRK,
-    MOVB_RR=0x30, MOVW_RR, MOVL_RR, MOVF_RR, MOVB_RK, MOVW_RK, MOVL_RK, MOVF_RK, MOVB_SR=0x38, MOVB_RS=0x3A, MOVB_SK=0x3C,
-    SWPB=0x40, SWPW, SWPL, SWPF, POPX_R=0x48, POPX_S, POPX_X, PSHX_R=0x4C, PSHX_S, PSHX_K,
+    LODB_RRK=0x10, LODW_RRK, LODL_RRK, LODF_RRK, LLODB_RRK, LLODW_RRK, LLODL_RRK, LLODF_RRK, STOB_RRK, STOW_RRK, STOL_RRK, STOF_RRK, LSTOB_RRK, LSTOW_RRK, LSTOL_RRK, LSTOF_RRK,
+    ALODB_RRK=0x20, ALODW_RRK, ALODL_RRK, ALODF_RRK, ALLODB_RRK, ALLODW_RRK, ALLODL_RRK, ALLODF_RRK, ASTOB_RRK, ASTOW_RRK, ASTOL_RRK, ASTOF_RRK, ALSTOB_RRK, ALSTOW_RRK, ALSTOL_RRK, ALSTOF_RRK,
+    MOVB_RR=0x30, MOVW_RR, MOVL_RR, MOVF_RR, MOVB_RK, MOVW_RK, MOVL_RK, MOVF_RK,
+    SWPB=0x38, SWPW, SWPL, SWPF, POPX_R=0x3C, PSHX_R, POPX_X, PSHX_K,
     BTOF=0x50, WTOF, LTOF, FTOB=0x54, FTOW, FTOL,
     AJMP=0x60, LAJMP, AJSR, LAJSR, RJMP, LRJMP, RJSR, LRJSR,
     JCC=0x70, JHC, JFC, JTC, JIC, JVC, JZC, JSC, JCS=0x78, JHS, JFS, JTS, JIS, JVS, JZS, JSS,
@@ -71,6 +71,14 @@ enum Register {
     REG_BH,
     REG_CH,
     REG_DH,
+    REG_RESERVE1,
+    REG_RESERVE2,
+    REG_RESERVE3,
+    REG_RESERVE4,
+    REG_ST=0x0C,
+    REG_PC,
+    REG_SP,
+    REG_ZE,
 };
 
 struct State {
@@ -85,6 +93,8 @@ struct State {
     uint32_t read_register(uint8_t reg, uint8_t type);
     void write_register(uint8_t reg, uint8_t type, uint32_t val);
 
+    uint32_t read_control_register(uint8_t reg);
+    void write_control_register(uint8_t reg, uint32_t val);
     uint8_t readb_register(uint8_t reg);
     void writeb_register(uint8_t reg, uint8_t val);
     uint16_t readw_register(uint8_t reg);
@@ -132,7 +142,11 @@ class BCpu : public ::Cpu {
     int op_wait; // how many clks to wait until commiting
 
     Delta decode_control(uint8_t op1);
+    Delta decode_load_store(uint8_t op1);
     Delta decode_move(uint8_t op1);
+    Delta decode_swap(uint8_t op1);
+    Delta decode_push_pop(uint8_t op1);
+    Delta decode_transfer(uint8_t op1);
     Delta decode_jump(uint8_t op1);
     Delta decode_arithmetic(uint8_t op1);
     Delta decode();

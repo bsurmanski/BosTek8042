@@ -122,18 +122,19 @@ TEST_F(BCpuTest, LOD) {
     mem->fill(0x2000, sizeof(test_data), test_data);
 
     Delta e;
-    e = Execute(TestOp(LODB_RK, 0x01, 0xfc, 0x0f));
+    e = Execute(TestOp(LODB_RRK, 0x01, 0xfc, 0x0f));
     EXPECT_EQ(e.next.readb_register(REG_B), 0x12);
 
-    e = Execute(TestOp(LODB_RK, 0x01, 0xfc, 0x0f));
+    e = Execute(TestOp(LODB_RRK, 0x01, 0xfc, 0x0f));
     EXPECT_EQ(e.next.readb_register(REG_B), 0x9a);
 
-    e = Execute(TestOp(LODW_RK, 0x01, 0xf8, 0x0f));
+    e = Execute(TestOp(LODW_RRK, 0x01, 0xf8, 0x0f));
     EXPECT_EQ(e.next.readw_register(REG_B), 0xbc9a);
 
-    e = Execute(TestOp(LODL_RK, 0x01, 0xf4, 0x0f));
+    e = Execute(TestOp(LODL_RRK, 0x01, 0xf4, 0x0f));
     EXPECT_EQ(e.next.readl_register(REG_B), 0xffdebc9a);
 
+    // register offset
     cpu->state.writew_register(REG_C, 0x03);
     e = Execute(TestOp(LODB_RRK, 0x21, 0xec, 0x0f));
     EXPECT_EQ(e.next.readb_register(REG_B), 0x78);
@@ -153,23 +154,24 @@ TEST_F(BCpuTest, LOD) {
 TEST_F(BCpuTest, STO) {
     Delta e;
     cpu->state.writew_register(REG_B, 0x1234);
-    e = Execute(TestOp(STOB_RK, 0x01, 0xfc, 0x0f));
+    e = Execute(TestOp(STOB_RRK, 0x01, 0xfc, 0x0f));
     EXPECT_EQ(e.wb_type, Bostek::Cpu::TYPE_BYTE);
     EXPECT_EQ(e.wb_addr, 0x2000);
     EXPECT_EQ(e.wb_value, 0x34);
 
     cpu->state.writew_register(REG_B, 0x5678);
-    e = Execute(TestOp(STOW_RK, 0x01, 0xfc, 0x0f));
+    e = Execute(TestOp(STOW_RRK, 0x01, 0xfc, 0x0f));
     EXPECT_EQ(e.wb_type, Bostek::Cpu::TYPE_WORD);
     EXPECT_EQ(e.wb_addr, 0x2004);
     EXPECT_EQ(e.wb_value, 0x5678);
 
     cpu->state.writel_register(REG_B, 0x12345678);
-    e = Execute(TestOp(STOL_RK, 0x01, 0xfc, 0x0f));
+    e = Execute(TestOp(STOL_RRK, 0x01, 0xfc, 0x0f));
     EXPECT_EQ(e.wb_type, Bostek::Cpu::TYPE_LONG);
     EXPECT_EQ(e.wb_addr, 0x2008);
     EXPECT_EQ(e.wb_value, 0x12345678);
 
+    // test register offset
     cpu->state.writel_register(REG_C, 0xFFFF0002);
     cpu->state.writel_register(REG_B, 0xABCD);
     e = Execute(TestOp(STOW_RRK, 0x21, 0xfc, 0x0f));
@@ -211,14 +213,14 @@ TEST_F(BCpuTest, MOV) {
     e = Execute(TestOp(MOVW_RK, REG_DH, 0x11, 0x22));
     EXPECT_EQ(e.next.readl_register(REG_D), 0x22115544);
 
-    e = Execute(TestOp(MOVB_SK, 0x00, 0x12));
+    e = Execute(TestOp(MOVB_RK, REG_ST, 0x12));
     EXPECT_EQ(e.next.sb, 0x12);
 
-    e = Execute(TestOp(MOVB_RS, REG_B));
+    e = Execute(TestOp(MOVB_RR, REG_B | (REG_ST << 4)));
     EXPECT_EQ(e.next.readb_register(REG_B), 0x12);
 
     Execute(TestOp(MOVB_RK, REG_B, 0xab));
-    e = Execute(TestOp(MOVB_SR, REG_B << 4));
+    e = Execute(TestOp(MOVB_RR, REG_ST | (REG_B << 4)));
     EXPECT_EQ(e.next.sb, 0xab);
 }
 
@@ -247,11 +249,11 @@ TEST_F(BCpuTest, PSH_POP) {
 
     Execute(TestOp(ANSB_K, 0x00));
     Execute(TestOp(ORSB_K, 0x58));
-    e = Execute(TestOp(PSHX_S, TYPE_BYTE << 4));
+    e = Execute(TestOp(PSHX_R, (TYPE_BYTE << 4) | REG_ST));
     EXPECT_EQ(e.wb_value, 0x58);
     EXPECT_EQ(e.next.sp, 0x0FFF);
     Execute(TestOp(ANSB_K, 0x00));
-    e = Execute(TestOp(POPX_S, TYPE_BYTE << 4));
+    e = Execute(TestOp(POPX_R, (TYPE_BYTE << 4) | REG_ST));
     EXPECT_EQ(e.next.sb, 0x58);
     EXPECT_EQ(e.next.sp, 0x1000);
 

@@ -114,13 +114,40 @@ void State::write_register(uint8_t reg, uint8_t type, uint32_t val) {
     }
 }
 
+uint32_t State::read_control_register(uint8_t reg) {
+    switch(reg) {
+        case REG_ST:
+            return sb;
+        case REG_PC:
+            return pc;
+        case REG_SP:
+            return sp;
+        default:
+            return 0;
+    }
+}
+
+void State::write_control_register(uint8_t reg, uint32_t val) {
+    switch(reg) {
+        case REG_ST:
+            sb = val & 0xFF;
+            break;
+        case REG_PC:
+            pc = val;
+            break;
+        case REG_SP:
+            sp = val;
+            break;
+    }
+}
+
 uint8_t State::readb_register(uint8_t reg) {
     if(reg < 4) {
         return registers[reg] & 0xFF;
     } else if(reg < 8) {
         return (registers[reg-4] & 0xFF00) >> 8;
     }
-    return 0;
+    return (uint8_t) read_control_register(reg);
 }
 
 void State::writeb_register(uint8_t reg, uint8_t val) {
@@ -128,6 +155,8 @@ void State::writeb_register(uint8_t reg, uint8_t val) {
         registers[reg] = (registers[reg] & 0xFFFFFF00) | val;
     } else if(reg < 8) {
         registers[reg-4] = (registers[reg-4] & 0xFFFF00FF) | (val << 8);
+    } else {
+        write_control_register(reg, val);
     }
 }
 
@@ -137,7 +166,7 @@ uint16_t State::readw_register(uint8_t reg) {
     } else if(reg < 8) {
         return (registers[reg-4] & 0xFFFF0000) >> 16;
     }
-    return 0;
+    return (uint16_t) read_control_register(reg);
 }
 
 void State::writew_register(uint8_t reg, uint16_t val) {
@@ -145,19 +174,27 @@ void State::writew_register(uint8_t reg, uint16_t val) {
         registers[reg] = (registers[reg] & 0xFFFF0000) | val;
     } else if(reg < 8) {
         registers[reg-4] = (registers[reg-4] & 0x0000FFFF) | (val << 16);
+    } else {
+        write_control_register(reg, val);
     }
 }
 
 uint32_t State::readl_register(uint8_t reg) {
     if(reg < 4) {
         return registers[reg];
+    } else if(reg < 8) {
+        return 0; // high bytes for long are set to zero
     }
-    return 0;
+    return read_control_register(reg);
 }
 
 void State::writel_register(uint8_t reg, uint32_t val) {
     if(reg < 4) {
         registers[reg] = val;
+    } else if(reg < 8) {
+        return; // no high version of long registers
+    } else {
+        write_control_register(reg, val);
     }
 }
 
@@ -242,204 +279,228 @@ Delta BCpu::decode_control(uint8_t op1) {
     return next;
 }
 
-Delta BCpu::decode_move(uint8_t op1) {
+Delta BCpu::decode_load_store(uint8_t op1) {
     State next(state);
     Type wb_type = TYPE_NONE; // used for PSH/POP
     uint32_t wb_addr = 0; // used for PSH/POP
     uint32_t wb_value = 0; // used for PSH/POP
 
-    if(op1 <= LSTOF_RRK) { // load/store
-        bool store = op1 & 0x08;
-        bool relative = op1 & 0x20;
-        bool far = op1 & 0x04;
-        Type type = (Type) (op1 & 0x03);
-        uint8_t op2 = nbr->readb(state.pc+1); // registers
-        uint32_t addr;
+    bool store = op1 & 0x08;
+    bool relative = op1 & 0x10;
+    bool far = op1 & 0x04;
+    Type type = (Type) (op1 & 0x03);
+    uint8_t op2 = nbr->readb(state.pc+1); // registers
+    uint32_t addr;
 
-        if(far) {
-            // relative to next instruction
-            addr = state.pc + 4 + nbr->readl(state.pc+2);
-        } else {
-            // relative to next instruction
-            addr = state.pc + 4 + nbr->readw(state.pc+2);
-        }
+    if(far) {
+        addr = nbr->readl(state.pc+2);
+    } else {
+        addr = nbr->readw(state.pc+2);
+    }
 
-        if(relative) {
-            uint16_t offset = state.readw_register((op2 & 0xF0) >> 4);
-            if(offset & sign_mask(TYPE_WORD)) {
-                addr -= abs_value(TYPE_WORD, offset);
-            } else {
-                addr += offset;
-            }
-        }
-        if(store) {
-            wb_type = type;
-            wb_addr = addr;
-            wb_value = state.read_register(op2 & 0x0F, type);
-        } else { // load
-            switch(type) {
-                default:
-                case TYPE_BYTE:
-                    next.write_register(op2 & 0x0F, type, nbr->readb(addr));
-                    break;
-                case TYPE_WORD:
-                    next.write_register(op2 & 0x0F, type, nbr->readw(addr));
-                    break;
-                case TYPE_LONG:
-                case TYPE_FLOAT:
-                    next.write_register(op2 & 0x0F, type, nbr->readl(addr));
-                    break;
-            }
-        }
+    if(relative) {
+        addr += state.pc + 4;
+    }
 
-        next.pc += 4;
-    } else if(op1 <= MOVB_SK) { // move, load constant
-        bool mov_to_sb = (op1 & 0x08) && !(op1 & 0x02);
-        bool mov_from_sb = (op1 & 0x08) && (op1 & 0x02);
-        bool use_constant = op1 & 0x04;
-        uint8_t op2 = nbr->readb(state.pc+1);
-        uint8_t type;
-        if(mov_to_sb || mov_from_sb) {
-            type = TYPE_BYTE;
-        } else {
-            type = op1 & 0x03;
-        }
-        uint32_t val;
-        if(use_constant) { // move in constant
-            switch(type) {
-                case TYPE_BYTE:
-                    val = nbr->readb(state.pc+2);
-                    next.pc+=3;
-                    break;
-                case TYPE_WORD:
-                    val = nbr->readw(state.pc+2);
-                    next.pc+=4;
-                    break;
-                case TYPE_LONG:
-                case TYPE_FLOAT:
-                    val = nbr->readl(state.pc+2);
-                    next.pc+=6;
-                    break;
-            }
-        } else if(mov_from_sb) {
-            val = state.sb;
-            next.pc += 2;
-        } else { // move from register
-            val = state.read_register((op2 & 0xF0) >> 4, type);
-            next.pc+=2;
-        }
+    uint16_t reg_offset = state.readw_register((op2 & 0xF0) >> 4);
+    if(reg_offset & sign_mask(TYPE_WORD)) {
+        addr -= abs_value(TYPE_WORD, reg_offset);
+    } else {
+        addr += reg_offset;
+    }
 
-        if(mov_to_sb) {
-            next.sb = val;
-        } else {
-            next.write_register(op2 & 0x0F, type, val);
-        }
-    } else if(op1 <= SWPF) { // swap
-        uint8_t op2 = nbr->readb(state.pc+1);
-        uint8_t reg1 = op2 & 0x0F;
-        uint8_t reg2 = (op2 & 0xF0) >> 4;
-        uint8_t type = op1 & 0x03;
-        uint32_t v1 = state.read_register(reg1, type);
-        uint32_t v2 = state.read_register(reg2, type);
-        next.write_register(reg1, type, v2);
-        next.write_register(reg2, type, v1);
-        next.pc += 2;
-    } else if(op1 <= PSHX_K) {
-        uint8_t op2 = nbr->readb(state.pc+1);
-        uint8_t type = (op2 & 0x30) >> 4;
-
-        //PSH
-        if(op1 & 0x04) {
-            uint32_t v;
-
-            // find value to write
-            // update next pc
-            switch(op1) {
-                case PSHX_R:
-                    v = state.read_register(op2 & 0x0F, type);
-                    next.pc += 2;
-                    break;
-                case PSHX_S:
-                    v = state.sb;
-                    next.pc += 2;
-                    break;
-                case PSHX_K:
-                    switch(type) {
-                        case TYPE_BYTE:
-                            v = nbr->readb(state.pc+2);
-                            next.pc += 3;
-                            break;
-                        case TYPE_WORD:
-                            v = nbr->readw(state.pc+2);
-                            next.pc += 4;
-                            break;
-                        case TYPE_LONG:
-                        case TYPE_FLOAT:
-                            v = nbr->readw(state.pc+2);
-                            next.pc += 6;
-                            break;
-                    }
-                    break;
-            }
-
-            // write value
-            // update sp
-            switch(type) {
-                case TYPE_BYTE:
-                    next.sp-=1;
-                    wb_type = TYPE_BYTE;
-                    wb_addr = next.sp;
-                    wb_value = v;
-                    break;
-                case TYPE_WORD:
-                    next.sp-=2;
-                    wb_type = TYPE_WORD;
-                    wb_addr = next.sp;
-                    wb_value = v;
-                    break;
-                case TYPE_LONG:
-                case TYPE_FLOAT:
-                    next.sp-=4;
-                    wb_type = TYPE_LONG;
-                    wb_addr = next.sp;
-                    wb_value = v;
-                    break;
-            }
-        } else { // else POP
-            // read value
-            // update sp
-            uint32_t v;
-            switch(type) {
-                case TYPE_BYTE:
-                    v = nbr->readb(next.sp);
-                    next.sp+=1;
-                    break;
-                case TYPE_WORD:
-                    v = nbr->readw(next.sp);
-                    next.sp+=2;
-                    break;
-                case TYPE_LONG:
-                case TYPE_FLOAT:
-                    v = nbr->readl(next.sp);
-                    next.sp+=4;
-                    break;
-            }
-
-            switch(op1) {
-                case POPX_R:
-                    next.write_register(op2 & 0x0F, type, v);
-                    break;
-                case POPX_S:
-                    next.sb = v & 0x000000FF;
-                    break;
-                case POPX_X:
-                    break;
-            }
-            next.pc += 2;
+    if(store) {
+        wb_type = type;
+        wb_addr = addr;
+        wb_value = state.read_register(op2 & 0x0F, type);
+    } else { // load
+        switch(type) {
+            default:
+            case TYPE_BYTE:
+                next.write_register(op2 & 0x0F, type, nbr->readb(addr));
+                break;
+            case TYPE_WORD:
+                next.write_register(op2 & 0x0F, type, nbr->readw(addr));
+                break;
+            case TYPE_LONG:
+            case TYPE_FLOAT:
+                next.write_register(op2 & 0x0F, type, nbr->readl(addr));
+                break;
         }
     }
 
+    next.pc += 4;
     return Delta(next, wb_type, wb_addr, wb_value);
+}
+
+Delta BCpu::decode_move(uint8_t op1) {
+    State next(state);
+
+    bool mov_to_sb = (op1 & 0x08) && !(op1 & 0x02);
+    bool mov_from_sb = (op1 & 0x08) && (op1 & 0x02);
+    bool use_constant = op1 & 0x04;
+    uint8_t op2 = nbr->readb(state.pc+1);
+    uint8_t type;
+    if(mov_to_sb || mov_from_sb) {
+        type = TYPE_BYTE;
+    } else {
+        type = op1 & 0x03;
+    }
+    uint32_t val;
+    if(use_constant) { // move in constant
+        switch(type) {
+            case TYPE_BYTE:
+                val = nbr->readb(state.pc+2);
+                next.pc+=3;
+                break;
+            case TYPE_WORD:
+                val = nbr->readw(state.pc+2);
+                next.pc+=4;
+                break;
+            case TYPE_LONG:
+            case TYPE_FLOAT:
+                val = nbr->readl(state.pc+2);
+                next.pc+=6;
+                break;
+        }
+    } else if(mov_from_sb) {
+        val = state.sb;
+        next.pc += 2;
+    } else { // move from register
+        val = state.read_register((op2 & 0xF0) >> 4, type);
+        next.pc+=2;
+    }
+
+    if(mov_to_sb) {
+        next.sb = val;
+    } else {
+        next.write_register(op2 & 0x0F, type, val);
+    }
+
+    return next;
+}
+
+Delta BCpu::decode_swap(uint8_t op1) {
+    State next(state);
+    uint8_t op2 = nbr->readb(state.pc+1);
+    uint8_t reg1 = op2 & 0x0F;
+    uint8_t reg2 = (op2 & 0xF0) >> 4;
+    uint8_t type = op1 & 0x03;
+    uint32_t v1 = state.read_register(reg1, type);
+    uint32_t v2 = state.read_register(reg2, type);
+    next.write_register(reg1, type, v2);
+    next.write_register(reg2, type, v1);
+    next.pc += 2;
+    return next;
+}
+
+Delta BCpu::decode_push_pop(uint8_t op1) {
+    State next(state);
+    Type wb_type = TYPE_NONE; // used for PSH/POP
+    uint32_t wb_addr = 0; // used for PSH/POP
+    uint32_t wb_value = 0; // used for PSH/POP
+
+    uint8_t op2 = nbr->readb(state.pc+1);
+    uint8_t type = (op2 & 0x30) >> 4;
+
+    //PSH
+    if(op1 & 0x01) {
+        uint32_t v;
+
+        // find value to write
+        // update next pc
+        switch(op1) {
+            case PSHX_R:
+                v = state.read_register(op2 & 0x0F, type);
+                next.pc += 2;
+                break;
+            case PSHX_K:
+                switch(type) {
+                    case TYPE_BYTE:
+                        v = nbr->readb(state.pc+2);
+                        next.pc += 3;
+                        break;
+                    case TYPE_WORD:
+                        v = nbr->readw(state.pc+2);
+                        next.pc += 4;
+                        break;
+                    case TYPE_LONG:
+                    case TYPE_FLOAT:
+                        v = nbr->readw(state.pc+2);
+                        next.pc += 6;
+                        break;
+                }
+                break;
+        }
+
+        // write value
+        // update sp
+        switch(type) {
+            case TYPE_BYTE:
+                next.sp-=1;
+                wb_type = TYPE_BYTE;
+                wb_addr = next.sp;
+                wb_value = v;
+                break;
+            case TYPE_WORD:
+                next.sp-=2;
+                wb_type = TYPE_WORD;
+                wb_addr = next.sp;
+                wb_value = v;
+                break;
+            case TYPE_LONG:
+            case TYPE_FLOAT:
+                next.sp-=4;
+                wb_type = TYPE_LONG;
+                wb_addr = next.sp;
+                wb_value = v;
+                break;
+        }
+    } else { // else POP
+        // read value
+        // update sp
+        uint32_t v;
+        switch(type) {
+            case TYPE_BYTE:
+                v = nbr->readb(next.sp);
+                next.sp+=1;
+                break;
+            case TYPE_WORD:
+                v = nbr->readw(next.sp);
+                next.sp+=2;
+                break;
+            case TYPE_LONG:
+            case TYPE_FLOAT:
+                v = nbr->readl(next.sp);
+                next.sp+=4;
+                break;
+        }
+
+        switch(op1) {
+            case POPX_R:
+                next.write_register(op2 & 0x0F, type, v);
+                break;
+            case POPX_X:
+                break;
+        }
+        next.pc += 2;
+    }
+
+    return Delta(next, wb_type, wb_addr, wb_value);
+}
+
+Delta BCpu::decode_transfer(uint8_t op1) {
+    if(op1 <= ALSTOF_RRK) {
+        return decode_load_store(op1);
+    } else if(op1 <= MOVF_RK) {
+        return decode_move(op1);
+    } else if(op1 <= SWPF) {
+        return decode_swap(op1);
+    } else if(op1 <= PSHX_K) {
+        return decode_push_pop(op1);
+    }
+
+    return state; // XXX ERROR
 }
 
 Delta BCpu::decode_jump(uint8_t op1) {
@@ -714,7 +775,7 @@ Delta BCpu::decode() {
     uint8_t  op1 = nbr->readb(state.pc);
 
     if(op1 <= 0x0F) return decode_control(op1);
-    else if(op1 <= 0x5F) return decode_move(op1);
+    else if(op1 <= 0x5F) return decode_transfer(op1);
     else if(op1 <= 0x7F) return decode_jump(op1);
     else return decode_arithmetic(op1);
 }
