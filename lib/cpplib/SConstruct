@@ -37,7 +37,7 @@ obj = {}
 
 for k in src:
 	obj[k] = env.Object(['build/' + s for s in src[k]], CCFLAGS=cxxflags, LIBS=libs)
-	lib = env.Library('bin/libccp_' + k, obj[k], CCFLAGS=cxxflags, LIBS=libs)
+	lib = env.Library('bin/libcpp_' + k, obj[k], CCFLAGS=cxxflags, LIBS=libs)
 
 libcpp = env.Library('bin/libcpp', obj.values(), CCFLAGS=cxxflags, LIBS=libs)
 
