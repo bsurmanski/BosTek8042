@@ -12,15 +12,18 @@ asm_srcs = ['bostek/asm.cpp',]
 
 srcs = ['build/' + s for s in srcs]
 asm_srcs = ['build/' + s for s in asm_srcs]
-cpplib_a = ['lib/cpplib/bin/cpplib_common.a']
 
 exe_cflags = ['-Isrc', '-Ilib/cpplib/src', '-g']
-exe_lflags = ['-Llib/cpplib/bin', '-L.', '-lcpplib_common']
-bostek_a = env.Library('bin/bostek', srcs+cpplib_a, CCFLAGS=exe_cflags)
-env.Program('bin/basm', asm_srcs+bostek_a+cpplib_a, CCFLAGS=exe_cflags)
+lflags = ['-Llib/cpplib/bin', '-L.']
+libs = ['-lcpp_common']
 
-tests = ['bcpu_test.cpp']
-tests = ['build/test/' + t for t in tests]
+src_o = env.Object(srcs, CCFLAGS=exe_cflags)
+env.Library('bin/bostek', src_o, CCFLAGS=exe_cflags, LINKFLAGS=lflags, LIBS=libs)
+env.Program('bin/basm', asm_srcs, CCFLAGS=exe_cflags, LINKFLAGS=lflags, LIBS=libs)
+
+test_src = ['bcpu_test.cpp']
+test_src = ['build/test/' + t for t in test_src]
 test_cflags = ['-Isrc', '-Ilib/cpplib/src']
-test_lflags = ['-lgtest', '-lgtest_main']
-env.Program('bin/gtest', tests+bostek_a+cpplib_a, CCFLAGS=test_cflags, LINKFLAGS=test_lflags)
+test_libs = libs + ['-lgtest', '-lgtest_main']
+test_lflags = lflags + ['-pthread']
+env.Program('bin/gtest', test_src+src_o, CCFLAGS=test_cflags, LINKFLAGS=test_lflags, LIBS=test_libs)
